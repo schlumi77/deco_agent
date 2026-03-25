@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { DivePlanRequest, GasMix } from '../types';
+import { API_BASE_URL } from '../api';
 
 interface Props {
   onPlanChange: (request: DivePlanRequest) => void;
@@ -24,8 +25,7 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
   });
 
   useEffect(() => {
-    const hostname = window.location.hostname;
-    fetch(`http://${hostname}:8000/api/gases`)
+    fetch(`${API_BASE_URL}/api/gases`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch gases');
         return res.json();

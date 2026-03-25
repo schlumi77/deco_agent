@@ -4,7 +4,8 @@ import DiveForm from './components/DiveForm';
 import TissueChart from './components/TissueChart';
 import DiveProfileChart from './components/DiveProfileChart';
 import type { DivePlanRequest, DivePlanResponse } from './types';
-import { Activity, Droplets, AlertTriangle, Table, Thermometer } from 'lucide-react';
+import { Activity, AlertTriangle } from 'lucide-react';
+import { API_BASE_URL } from './api';
 
 function App() {
   const [plan, setPlan] = useState<DivePlanResponse | null>(null);
@@ -17,8 +18,7 @@ function App() {
     setError(null);
     setModel(request.model);
     try {
-      const hostname = window.location.hostname;
-      const response = await fetch(`http://${hostname}:8000/api/plan`, {
+      const response = await fetch(`${API_BASE_URL}/api/plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
