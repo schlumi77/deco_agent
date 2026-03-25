@@ -36,5 +36,3 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./frontend/dist
-          # Add a CNAME if the user has a custom domain
-          # cname: example.com
