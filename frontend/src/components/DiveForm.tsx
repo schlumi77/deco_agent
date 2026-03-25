@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { DivePlanRequest } from '../types';
-import { GASES, Gas } from '../engine/planner';
+import { GASES, type Gas } from '../engine/planner';
 
 interface Props {
   onPlanChange: (request: DivePlanRequest) => void;
