@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import type { DivePlanRequest, GasMix } from '../types';
-import { API_BASE_URL } from '../api';
+import type { DivePlanRequest } from '../types';
+import { GASES, Gas } from '../engine/planner';
 
 interface Props {
   onPlanChange: (request: DivePlanRequest) => void;
 }
 
 const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
-  const [gases, setGases] = useState<GasMix[]>([]);
+  const [gases] = useState<Gas[]>(GASES);
   const [request, setRequest] = useState<DivePlanRequest>({
     depth: 45,
     bottom_time: 20,
@@ -25,27 +25,16 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
   });
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/gases`)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch gases');
-        return res.json();
-      })
-      .then(data => {
-        setGases(data);
-        if (data.length > 0) {
-          const air = data.find((g: GasMix) => g.name === 'Air');
-          const nx32 = data.find((g: GasMix) => g.name === 'Nx 32');
-          const firstBottom = data.find((g: GasMix) => g.type === 'bottom');
-          setRequest(prev => ({ 
-            ...prev, 
-            bottom_gas: air ? 'Air' : (nx32 ? 'Nx 32' : (firstBottom ? firstBottom.name : data[0].name)) 
-          }));
-        }
-      })
-      .catch(err => {
-        console.error("Gas fetch error:", err);
-      });
-  }, []);
+    if (gases.length > 0) {
+      const air = gases.find((g: Gas) => g.name === 'Air');
+      const nx32 = gases.find((g: Gas) => g.name === 'Nx 32');
+      const firstBottom = gases.find((g: Gas) => g.type === 'bottom');
+      setRequest(prev => ({ 
+        ...prev, 
+        bottom_gas: air ? 'Air' : (nx32 ? 'Nx 32' : (firstBottom ? firstBottom.name : gases[0].name)) 
+      }));
+    }
+  }, [gases]);
 
   useEffect(() => {
     if (request.bottom_gas) {

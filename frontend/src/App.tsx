@@ -5,7 +5,7 @@ import TissueChart from './components/TissueChart';
 import DiveProfileChart from './components/DiveProfileChart';
 import type { DivePlanRequest, DivePlanResponse } from './types';
 import { Activity, AlertTriangle } from 'lucide-react';
-import { API_BASE_URL } from './api';
+import { planDive, calculateGasConsumption } from './engine/planner';
 
 function App() {
   const [plan, setPlan] = useState<DivePlanResponse | null>(null);
@@ -17,24 +17,49 @@ function App() {
     setLoading(true);
     setError(null);
     setModel(request.model);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/plan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
-      });
+    
+    // Simulate async if needed, but here it's fast enough to be sync
+    // We wrap in a small timeout to let the UI show "CALCULATING" if desired
+    setTimeout(() => {
+      try {
+        const result = planDive(
+          request.depth,
+          request.bottom_time,
+          request.bottom_gas,
+          request.deco_gases,
+          request.gf_low / 100,
+          request.gf_high / 100,
+          request.is_ccr,
+          request.setpoint,
+          request.deco_setpoint,
+          request.descent_rate,
+          request.ascent_rate,
+          request.force_6m,
+          request.model
+        );
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || 'Failed to calculate plan');
+        const gasReqs = calculateGasConsumption(
+          result.schedule,
+          request.depth,
+          request.bottom_time,
+          request.bottom_gas,
+          15.0, // default SAC
+          request.is_ccr,
+          1.0, // default O2 cons
+          request.descent_rate,
+          request.ascent_rate
+        );
+
+        setPlan({
+          ...result,
+          gas_requirements: gasReqs
+        });
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-      const data = await response.json();
-      setPlan(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    }, 10);
   }, []);
 
   return (
