@@ -262,7 +262,7 @@ def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_
             deco_schedule.append((get_ascent_display_depth(current_depth, depth), 1.0, round(total_time), current_gas_name, engine.toxicity_tracker.cns_percent, engine.toxicity_tracker.otus))
 
     # Consolidate
-    final_schedule = []
+    final_schedule = [(depth, bottom_time, round(depth/descent_rate + bottom_time), current_gas_name, engine.toxicity_tracker.cns_percent, engine.toxicity_tracker.otus)]
     if deco_schedule:
         curr_d, curr_t, curr_rt, curr_g, curr_c, curr_o = deco_schedule[0]
         total_stop_t = curr_t

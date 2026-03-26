@@ -102,6 +102,28 @@ python3 deko_agent.py
 
 ---
 
+## 🧪 Testing
+
+The project includes a comprehensive test suite covering the physiological engine, the dive planner, and the FastAPI endpoints.
+
+### Running Tests
+Ensure you have the development dependencies installed:
+```bash
+pip install pytest httpx
+```
+
+Run all tests:
+```bash
+pytest
+```
+
+The test suite includes:
+-   `test_deco_engine.py`: Unit tests for ZHL-16 math, Schreiner equation, and toxicity tracking.
+-   `test_deko_agent.py`: Integration tests for the dive planning logic and data loading.
+-   `test_api.py`: Functional tests for the FastAPI REST endpoints.
+
+---
+
 ## 🏗 Project Structure
 
 -   `deco_engine.py`: The physiological core (ZHL-16C math, CNS/OTU tracking, Schreiner logic).
@@ -115,14 +137,6 @@ python3 deko_agent.py
 -   `gas_config.json`: Database of standard diving gases (Air, Nitrox, Trimix).
 -   `cylinders.json`: Configuration for common cylinder sizes and volumes.
 -   `calculate_all_scenarios.py`: Batch utility for generating multiple dive scenarios.
-
----
-
-## 📊 Sample Plans
-
-Check out the pre-generated markdown dive plans in the root directory for examples:
-- `Dive_Plan_150m.md`: Standard CCR plan to 150m.
-- `Dive_Plan_50m.md`: Comparison of OC vs CCR for a 50m dive.
 
 ---
 
