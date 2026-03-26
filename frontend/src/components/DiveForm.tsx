@@ -11,7 +11,7 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
   const [request, setRequest] = useState<DivePlanRequest>({
     depth: 45,
     bottom_time: 20,
-    bottom_gas: 'Tx21/35',
+    bottom_gas: 'Tx 21/35',
     deco_gases: [],
     gf_low: 50,
     gf_high: 80,
