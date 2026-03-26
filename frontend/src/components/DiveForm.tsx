@@ -37,15 +37,18 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
   }, [gases]);
 
   useEffect(() => {
-    if (request.bottom_gas) {
+    if (request.bottom_gas && !isNaN(request.depth) && !isNaN(request.bottom_time)) {
       onPlanChange(request);
     }
-  }, [request]);
+  }, [request, onPlanChange]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : 
-                type === 'number' ? parseFloat(value) : value;
+    let val: any = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
+    
+    if (type === 'number') {
+      val = value === '' ? 0 : parseFloat(value);
+    }
     
     setRequest(prev => ({ ...prev, [name]: val }));
   };

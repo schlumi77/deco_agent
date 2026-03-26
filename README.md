@@ -89,6 +89,19 @@ python3 deko_agent.py
 
 ---
 
+## ✨ Recent Improvements (v2.1)
+
+-   **Enhanced Input Stability**: Fixed a critical bug where empty numeric inputs (like depth or time) could cause the calculation engine to hang. Inputs now default to safe values or skip calculation until valid.
+-   **Mobile Accessibility**:
+    -   Implemented horizontal scrolling for the settings toolbar on mobile devices.
+    -   Responsive dashboard layout where panels stack on narrow screens.
+-   **Engine & API Enhancements**:
+    -   Added **Air (21/0)** as a standard gas.
+    -   Improved gas consumption logic to include final ascent segments.
+    -   Added strict finite-number validation in the API.
+
+---
+
 ## 🏗 Project Structure
 
 -   `deco_engine.py`: The physiological core (ZHL-16C math, CNS/OTU tracking, Schreiner logic).
