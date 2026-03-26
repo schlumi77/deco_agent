@@ -125,8 +125,8 @@ function App() {
                   <thead>
                     <tr>
                       <th>DEPTH</th>
-                      <th>TIME</th>
-                      <th>RT</th>
+                      <th>TIME (MIN)</th>
+                      <th>RT (MIN)</th>
                       <th>GAS</th>
                       <th>CNS</th>
                     </tr>
@@ -135,8 +135,8 @@ function App() {
                     {plan?.schedule.map((entry, i) => (
                       <tr key={i}>
                         <td>{entry.depth}m</td>
-                        <td>{entry.time}m</td>
-                        <td>{entry.run_time}m</td>
+                        <td>{entry.time} min</td>
+                        <td>{entry.run_time} min</td>
                         <td>{entry.gas.replace('CCR SP ', 'SP ')}</td>
                         <td>{entry.cns.toFixed(0)}%</td>
                       </tr>

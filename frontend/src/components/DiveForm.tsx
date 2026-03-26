@@ -26,12 +26,13 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
 
   useEffect(() => {
     if (gases.length > 0) {
+      const tx2135 = gases.find((g: Gas) => g.name === 'Tx 21/35');
       const air = gases.find((g: Gas) => g.name === 'Air');
       const nx32 = gases.find((g: Gas) => g.name === 'Nx 32');
       const firstBottom = gases.find((g: Gas) => g.type === 'bottom');
       setRequest(prev => ({ 
         ...prev, 
-        bottom_gas: air ? 'Air' : (nx32 ? 'Nx 32' : (firstBottom ? firstBottom.name : gases[0].name)) 
+        bottom_gas: tx2135 ? 'Tx 21/35' : (air ? 'Air' : (nx32 ? 'Nx 32' : (firstBottom ? firstBottom.name : gases[0].name))) 
       }));
     }
   }, [gases]);
