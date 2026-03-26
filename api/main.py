@@ -3,16 +3,20 @@ import os
 import math
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
+from typing import List, Dict
 
 # Add parent directory to sys.path to import deko_agent and deco_engine
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from deko_agent import plan_dive_with_engine, calculate_gas_consumption, load_gases, load_cylinders
 from deco_engine import DecoEngine
-from .models import DivePlanRequest, DivePlanResponse, ScheduleEntry, TissueLoad, ProfileEntry, GasRequirements
+from .models import DivePlanRequest, DivePlanResponse, ScheduleEntry, TissueLoad, ProfileEntry, GasRequirements, GasMix
 
-app = FastAPI(title="Deko Agent API")
+app = FastAPI(
+    title="Deco Agent API",
+    description="High-precision technical diving gas management and decompression planning utility.",
+    version="2.1.0",
+)
 
 # Enable CORS for local development
 app.add_middleware(
@@ -23,15 +27,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/api/gases")
+@app.get("/api/gases", summary="Get standard diving gases", response_description="List of available gases", response_model=List[GasMix])
 def get_gases():
     return load_gases()
 
-@app.get("/api/cylinders")
+@app.get("/api/cylinders", summary="Get standard cylinder sizes", response_description="List of available cylinders", response_model=List[Dict])
 def get_cylinders():
     return load_cylinders()
 
-@app.post("/api/plan", response_model=DivePlanResponse)
+@app.post("/api/plan", response_model=DivePlanResponse, summary="Calculate a dive plan", response_description="Detailed dive schedule and gas requirements")
 def plan_dive(request: DivePlanRequest):
     try:
         # Validate finite numbers

@@ -102,6 +102,23 @@ python3 deko_agent.py
 
 ---
 
+## 📚 API Documentation & Type Safety
+
+FastAPI automatically generates interactive Swagger documentation for the API. When the backend is running, visit:
+- **Swagger UI**: `http://localhost:8000/docs`
+
+The frontend leverages `openapi-typescript` to ensure strict type safety that perfectly matches the backend Pydantic models. To regenerate the TypeScript interfaces after modifying the API:
+```bash
+# 1. Dump the OpenAPI schema from the FastAPI backend
+python3 dump_openapi.py
+
+# 2. Generate the types in the frontend
+cd frontend
+npm run generate-api-types
+```
+
+---
+
 ## 🧪 Testing
 
 The project includes a comprehensive test suite covering the physiological engine, the dive planner, and the FastAPI endpoints.
