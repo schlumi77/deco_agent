@@ -68,7 +68,7 @@ function App() {
       <header className="app-header">
         <div className="logo">
           <Activity size={24} color="#00ffcc" />
-          <h1>DEKO_AGENT <span className="version">v2.0</span></h1>
+          <h1>DECO AGENT <span className="version">v2.1</span></h1>
         </div>
         <div className="status">
           {loading ? <span className="blink">CALCULATING...</span> : <span>ENGINE: ZHL-16{model}</span>}

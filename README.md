@@ -6,7 +6,7 @@
 [![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 [![Vite](https://img.shields.io/badge/build-Vite-646CFF.svg)](https://vitejs.dev/)
 
-**Deco_agent** is a high-precision technical diving gas management and decompression planning utility. Designed for both **mCCR (mechanical Closed Circuit Rebreather)** and **Open Circuit** diving, it implements the industry-standard **Bühlmann ZHL-16C** decompression model with user-definable **Gradient Factors**.
+**Deco Agent** is a high-precision technical diving gas management and decompression planning utility. Designed for both **mCCR (mechanical Closed Circuit Rebreather)** and **Open Circuit** diving, it implements the industry-standard **Bühlmann ZHL-16C** decompression model with user-definable **Gradient Factors**.
 
 ---
 

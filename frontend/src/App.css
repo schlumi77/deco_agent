@@ -117,6 +117,12 @@ body {
   font-weight: bold;
 }
 
+.unit-label {
+  font-size: 8px;
+  color: #444;
+  margin-left: -2px;
+}
+
 .form-group-inline input, .form-group-inline select {
   background-color: #000;
   border: 1px solid #333;

@@ -37,7 +37,11 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
   }, [gases]);
 
   useEffect(() => {
-    if (request.bottom_gas && !isNaN(request.depth) && !isNaN(request.bottom_time)) {
+    if (request.bottom_gas && 
+        !isNaN(request.depth) && 
+        !isNaN(request.bottom_time) && 
+        !isNaN(request.descent_rate) && 
+        !isNaN(request.ascent_rate)) {
       onPlanChange(request);
     }
   }, [request, onPlanChange]);
@@ -111,6 +115,21 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
             </div>
           </>
         )}
+      </div>
+
+      <div className="toolbar-separator" />
+
+      <div className="toolbar-section">
+        <div className="form-group-inline">
+          <label>DESC</label>
+          <input type="number" name="descent_rate" value={request.descent_rate} onChange={handleChange} style={{width: '50px'}} />
+          <span className="unit-label">m/min</span>
+        </div>
+        <div className="form-group-inline">
+          <label>ASCE</label>
+          <input type="number" name="ascent_rate" value={request.ascent_rate} onChange={handleChange} style={{width: '50px'}} />
+          <span className="unit-label">m/min</span>
+        </div>
       </div>
 
       <div className="toolbar-separator" />
