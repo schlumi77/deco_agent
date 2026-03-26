@@ -93,7 +93,7 @@ export interface components {
              * Deco Setpoint
              * @default 1.2
              */
-            deco_setpoint: number | null;
+            deco_setpoint: number;
             /**
              * Descent Rate
              * @default 20

@@ -1,4 +1,4 @@
-import { components } from './api-types';
+import type { components } from './api-types';
 
 export type GasMix = components['schemas']['GasMix'];
 export type ScheduleEntry = components['schemas']['ScheduleEntry'];

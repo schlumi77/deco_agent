@@ -134,14 +134,7 @@
             "default": 1.2
           },
           "deco_setpoint": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "number",
             "title": "Deco Setpoint",
             "default": 1.2
           },
