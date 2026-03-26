@@ -82,17 +82,14 @@ export function planDive(
     let currentGasName = isCcr ? `CCR SP ${setpoint}` : bottomGasName;
 
     // Initial checks
-    if (isCcr) {
-        if (setpoint > 1.4) warnings.push(`Bottom setpoint pO2 too high: ${setpoint.toFixed(2)} bar`);
-        const p_amb_bottom = 1.0 + depth / 10.0;
-        const dil_po2_bottom = (p_amb_bottom - 0.0627) * diluent.fO2;
-        if (dil_po2_bottom > setpoint - 0.2) warnings.push(`Diluent pO2 too high at bottom: ${dil_po2_bottom.toFixed(2)} bar`);
-    } else {
-        const density = calculateGasDensity(diluent.fO2, diluent.fHe, depth);
-        if (density > 6.2) warnings.push(`Bottom gas density too high: ${density.toFixed(1)} g/L`);
-        const end = calculateEnd(depth, diluent.fHe);
-        if (end > 30) warnings.push(`Bottom gas END too deep: ${end.toFixed(0)}m`);
-    }
+    if (setpoint > 1.4) warnings.push(`Bottom setpoint pO2 too high: ${setpoint.toFixed(2)} bar`);
+    const p_amb_bottom = 1.0 + depth / 10.0;
+    const dil_po2_bottom = p_amb_bottom * diluent.fO2;
+    if (dil_po2_bottom > setpoint - 0.2) warnings.push(`Diluent pO2 too high at bottom: ${dil_po2_bottom.toFixed(2)} bar`);
+    const density = calculateGasDensity(diluent.fO2, diluent.fHe, depth);
+    if (density > 6.2) warnings.push(`Bottom gas density too high: ${density.toFixed(1)} g/L`);
+    const end = calculateEnd(depth, diluent.fHe);
+    if (end > 30) warnings.push(`Bottom gas END too deep: ${end.toFixed(0)}m`);
 
     // 1. Descent
     let currentD = 0.0;
