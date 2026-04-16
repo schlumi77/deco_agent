@@ -74,11 +74,11 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
       <div className="toolbar-section">
         <div className="form-group-inline">
           <label>DEPTH</label>
-          <input type="number" name="depth" value={request.depth} onChange={handleChange} style={{width: '60px'}} />
+          <input type="number" inputMode="numeric" name="depth" value={request.depth} onChange={handleChange} />
         </div>
         <div className="form-group-inline">
           <label>TIME</label>
-          <input type="number" name="bottom_time" value={request.bottom_time} onChange={handleChange} style={{width: '60px'}} />
+          <input type="number" inputMode="numeric" name="bottom_time" value={request.bottom_time} onChange={handleChange} />
         </div>
         <div className="form-group-inline">
           <label>GAS</label>
@@ -108,11 +108,11 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
           <>
             <div className="form-group-inline">
               <label>SP B</label>
-              <input type="number" name="setpoint" step="0.1" value={request.setpoint} onChange={handleChange} style={{width: '50px'}} />
+              <input type="number" inputMode="decimal" name="setpoint" step="0.1" value={request.setpoint} onChange={handleChange} />
             </div>
             <div className="form-group-inline">
               <label>SP D</label>
-              <input type="number" name="deco_setpoint" step="0.1" value={request.deco_setpoint} onChange={handleChange} style={{width: '50px'}} />
+              <input type="number" inputMode="decimal" name="deco_setpoint" step="0.1" value={request.deco_setpoint} onChange={handleChange} />
             </div>
           </>
         )}
@@ -123,12 +123,12 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
       <div className="toolbar-section">
         <div className="form-group-inline">
           <label>DESC</label>
-          <input type="number" name="descent_rate" value={request.descent_rate} onChange={handleChange} style={{width: '50px'}} />
+          <input type="number" inputMode="numeric" name="descent_rate" value={request.descent_rate} onChange={handleChange} />
           <span className="unit-label">m/min</span>
         </div>
         <div className="form-group-inline">
           <label>ASCE</label>
-          <input type="number" name="ascent_rate" value={request.ascent_rate} onChange={handleChange} style={{width: '50px'}} />
+          <input type="number" inputMode="numeric" name="ascent_rate" value={request.ascent_rate} onChange={handleChange} />
           <span className="unit-label">m/min</span>
         </div>
       </div>
@@ -138,15 +138,15 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
       <div className="toolbar-section">
         <div className="form-group-inline">
           <label>GF LOW</label>
-          <input type="number" name="gf_low" step="5" value={request.gf_low} onChange={handleChange} style={{width: '50px'}} />
+          <input type="number" inputMode="numeric" name="gf_low" step="5" value={request.gf_low} onChange={handleChange} />
         </div>
         <div className="form-group-inline">
           <label>GF HIGH</label>
-          <input type="number" name="gf_high" step="5" value={request.gf_high} onChange={handleChange} style={{width: '50px'}} />
+          <input type="number" inputMode="numeric" name="gf_high" step="5" value={request.gf_high} onChange={handleChange} />
         </div>
         <div className="form-group-inline">
           <label>MODEL</label>
-          <select name="model" value={request.model} onChange={handleChange} style={{width: '100px'}}>
+          <select name="model" value={request.model} onChange={handleChange}>
             <option value="B">ZH-L16B</option>
             <option value="C">ZH-L16C</option>
           </select>

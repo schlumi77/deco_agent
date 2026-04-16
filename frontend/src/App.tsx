@@ -4,7 +4,7 @@ import DiveForm from './components/DiveForm';
 import TissueChart from './components/TissueChart';
 import DiveProfileChart from './components/DiveProfileChart';
 import type { DivePlanRequest, DivePlanResponse } from './types';
-import { Activity, AlertTriangle } from 'lucide-react';
+import { Activity, AlertTriangle, Settings, ChevronUp } from 'lucide-react';
 import { planDive, calculateGasConsumption } from './engine/planner';
 
 function App() {
@@ -12,14 +12,13 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [model, setModel] = useState('C');
+  const [showMobileParams, setShowMobileParams] = useState(false);
 
   const handlePlanChange = useCallback(async (request: DivePlanRequest) => {
     setLoading(true);
     setError(null);
     setModel(request.model);
     
-    // Simulate async if needed, but here it's fast enough to be sync
-    // We wrap in a small timeout to let the UI show "CALCULATING" if desired
     setTimeout(() => {
       try {
         const result = planDive(
@@ -54,8 +53,8 @@ function App() {
           ...result,
           gas_requirements: gasReqs
         });
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
         setLoading(false);
       }
@@ -64,19 +63,27 @@ function App() {
 
   return (
     <div className="app-container">
-      <div style={{position: 'absolute', top: 0, right: 0, padding: '5px', color: '#333', fontSize: '10px'}}>RENDER OK</div>
       <header className="app-header">
         <div className="logo">
           <Activity size={24} color="#00ffcc" />
           <h1>DECO AGENT <span className="version">v2.1</span></h1>
         </div>
-        <div className="status">
-          {loading ? <span className="blink">CALCULATING...</span> : <span>ENGINE: ZHL-16{model}</span>}
+        <div className="header-controls">
+          <div className="status desktop-only">
+            {loading ? <span className="blink">CALCULATING...</span> : <span>ENGINE: ZHL-16{model}</span>}
+          </div>
+          <button 
+            className={`mobile-toggle-btn ${showMobileParams ? 'active' : ''}`}
+            onClick={() => setShowMobileParams(!showMobileParams)}
+          >
+            {showMobileParams ? <ChevronUp size={20} /> : <Settings size={20} />}
+            <span>{showMobileParams ? 'CLOSE' : 'PARAMS'}</span>
+          </button>
         </div>
       </header>
 
       <main className="app-main-dashboard">
-        <div className="parameters-toolbar">
+        <div className={`parameters-toolbar ${showMobileParams ? 'mobile-visible' : ''}`}>
           <DiveForm onPlanChange={handlePlanChange} />
           {plan && (
             <div className="stats-badges">
@@ -97,6 +104,7 @@ function App() {
         </div>
 
         <div className="dashboard-content">
+          {loading && <div className="loading-overlay-mobile"><div className="blink">CALCULATING...</div></div>}
           {error && <div className="error-banner">{error}</div>}
           
           {plan && plan.warnings.length > 0 && (
@@ -125,20 +133,20 @@ function App() {
                   <thead>
                     <tr>
                       <th>DEPTH</th>
-                      <th>TIME (MIN)</th>
-                      <th>RT (MIN)</th>
+                      <th>TIME</th>
+                      <th>RT</th>
                       <th>GAS</th>
-                      <th>CNS</th>
+                      <th className="desktop-only">CNS</th>
                     </tr>
                   </thead>
                   <tbody>
                     {plan?.schedule.map((entry, i) => (
                       <tr key={i}>
                         <td>{entry.depth}m</td>
-                        <td>{entry.time} min</td>
-                        <td>{entry.run_time} min</td>
-                        <td>{entry.gas.replace('CCR SP ', 'SP ')}</td>
-                        <td>{entry.cns.toFixed(0)}%</td>
+                        <td>{entry.time}m</td>
+                        <td>{entry.run_time}m</td>
+                        <td className="gas-cell">{entry.gas.replace('CCR SP ', 'SP ')}</td>
+                        <td className="desktop-only">{entry.cns.toFixed(0)}%</td>
                       </tr>
                     ))}
                   </tbody>

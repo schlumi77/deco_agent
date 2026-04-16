@@ -61,20 +61,21 @@ const DiveProfileChart: React.FC<Props> = ({ data }) => {
   };
 
   return (
-    <div style={{ width: '100%', height: 350, backgroundColor: '#1a1a1a', padding: '10px', borderRadius: '8px', position: 'relative' }}>
+    <div style={{ width: '100%', height: '100%', backgroundColor: '#1a1a1a', padding: '10px', borderRadius: '8px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <h3 style={{ color: '#00ffcc', margin: 0, fontSize: '14px', fontFamily: 'monospace' }}>DIVE PROFILE (DEPTH vs TIME)</h3>
+        <h3 className="desktop-only" style={{ color: '#00ffcc', margin: 0, fontSize: '14px', fontFamily: 'monospace' }}>DIVE PROFILE (DEPTH vs TIME)</h3>
         {(left !== 'dataMin' || right !== 'dataMax') && (
           <button 
             onClick={zoomOut}
             style={{ 
               background: '#333', color: '#00ffcc', border: '1px solid #444', 
-              fontSize: '10px', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer' 
+              fontSize: '10px', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer' 
             }}
           >RESET ZOOM</button>
         )}
       </div>
-      <ResponsiveContainer width="100%" height="90%">
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
         <AreaChart 
           data={data} 
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
@@ -110,7 +111,7 @@ const DiveProfileChart: React.FC<Props> = ({ data }) => {
             contentStyle={{ backgroundColor: '#222', border: '1px solid #444', color: '#fff' }}
             itemStyle={{ color: '#00ffcc' }}
             formatter={(value: any) => [`${value}m`, 'Depth']}
-            labelFormatter={(label) => `Time: ${Math.round(label)} min`}
+            labelFormatter={(label) => `Time: ${Math.round(Number(label))} min`}
           />
           <Area 
             type="linear" 
@@ -145,7 +146,8 @@ const DiveProfileChart: React.FC<Props> = ({ data }) => {
           ) : null}
         </AreaChart>
       </ResponsiveContainer>
-      <div style={{ fontSize: '9px', color: '#444', textAlign: 'center' }}>DRAG TO ZOOM</div>
+      </div>
+      <div className="desktop-only" style={{ fontSize: '9px', color: '#444', textAlign: 'center' }}>DRAG TO ZOOM</div>
     </div>
   );
 };
