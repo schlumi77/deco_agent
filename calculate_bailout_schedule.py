@@ -8,13 +8,14 @@ def generate_oc_schedule_md(gf_low, gf_high):
     bottom_gas = "Tx 6/90"
     deco_gases = ["Oxygen", "Tx 50/15"]
     
-    schedule = plan_dive_with_engine(engine, depth, bottom_time, bottom_gas, deco_gases, 
+    result = plan_dive_with_engine(engine, depth, bottom_time, bottom_gas, deco_gases, 
                                     gf_low=gf_low, gf_high=gf_high, is_ccr=False)
+    schedule = result['schedule']
     
     md_table = "| Depth | Stop Time | Gas |\n| :--- | :--- | :--- |\n"
     md_table += f"| **{depth}m** | **{bottom_time} min** | **{bottom_gas}** |\n"
     
-    for d, t, g, c, o in schedule:
+    for d, t, rt, g, c, o in schedule:
         md_table += f"| {int(d)}m | {int(t)} min | {g} |\n"
         
     return md_table

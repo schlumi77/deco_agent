@@ -142,6 +142,7 @@ def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_
     # 3. Ascent and Deco
     current_depth = depth
     deco_schedule = [] # Stores (depth, time, run_time, gas, cns, otu)
+    stuck_counter = 0
     
     # Helper to quantize depth for ascent profile while ensuring it never exceeds bottom
     def get_ascent_display_depth(d, bottom_d):
@@ -154,6 +155,11 @@ def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_
         return q
 
     while current_depth > 0:
+        stuck_counter += 1
+        if stuck_counter > 5000:
+            warnings.append("Deco stuck: Infinite deco loop detected. Check gases and GF.")
+            break
+            
         gf_at_depth = gf_high - (gf_high - gf_low) * (current_depth / depth) if depth > 0 else gf_high
         ceiling = engine.get_ceiling(gf_at_depth)
         floor = 6.0 if force_6m else 3.0
@@ -185,10 +191,22 @@ def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_
                                 break
                         fo2, fhe = current_gas['fO2'], current_gas['fHe']
                         current_gas_name = current_gas['name']
+
+                    # Check deco gas limits
+                    end = calculate_end(current_depth, fhe)
+                    if end > 30:
+                        msg = f"Deco gas {current_gas_name} END too deep: {end:.0f}m"
+                        if msg not in warnings: warnings.append(msg)
                     
+                    density = calculate_gas_density(fo2, fhe, current_depth)
+                    if density > 6.2:
+                        msg = f"Deco gas {current_gas_name} density too high: {density:.1f} g/L"
+                        if msg not in warnings: warnings.append(msg)
+
                     engine.update_tissues(current_depth, next_d, travel_time, fo2, fhe)
                     total_time += travel_time
                     current_depth = next_d
+                    stuck_counter = 0
                     profile.append({'time': total_time, 'depth': get_ascent_display_depth(current_depth, depth), 'gas': current_gas_name})
                 break
             else:
@@ -227,9 +245,21 @@ def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_
                 fo2, fhe = current_gas['fO2'], current_gas['fHe']
                 current_gas_name = current_gas['name']
 
+            # Check deco gas limits
+            end = calculate_end(current_depth, fhe)
+            if end > 30:
+                msg = f"Deco gas {current_gas_name} END too deep: {end:.0f}m"
+                if msg not in warnings: warnings.append(msg)
+            
+            density = calculate_gas_density(fo2, fhe, current_depth)
+            if density > 6.2:
+                msg = f"Deco gas {current_gas_name} density too high: {density:.1f} g/L"
+                if msg not in warnings: warnings.append(msg)
+
             engine.update_tissues(current_depth, next_stop, travel_time, fo2, fhe)
             total_time += travel_time
             current_depth = next_stop
+            stuck_counter = 0
             profile.append({'time': total_time, 'depth': get_ascent_display_depth(current_depth, depth), 'gas': current_gas_name})
         else:
             # Must stay at current depth for 1 minute

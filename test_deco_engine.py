@@ -68,6 +68,34 @@ def test_get_ceiling():
     ceiling = engine.get_ceiling(1.0)
     assert ceiling > 0.0
 
+def test_toxicity_tracker_cns_low_po2():
+    tracker = OxygenToxicityTracker()
+    # At pO2 0.6, limit is 720 min. 7.2 min should be 1%
+    cns = tracker.calculate_cns_contribution(0.6, 7.2)
+    assert pytest.approx(cns) == 1.0
+    
+    # At pO2 0.5, contribution should be 0 (limit is None)
+    cns = tracker.calculate_cns_contribution(0.5, 60)
+    assert cns == 0.0
+
+def test_engine_model_b():
+    engine_c = DecoEngine(model="C")
+    engine_b = DecoEngine(model="B")
+    
+    # Compartments should be different
+    assert engine_c.compartments != engine_b.compartments
+    
+    # ZH-L16B has different a/b values than ZH-L16C
+    # Let's check first compartment 'a' value (index 1)
+    # Actually, the first few are often same, let's check index 5 (38.3 min half time)
+    assert engine_c.compartments[5][1] != engine_b.compartments[5][1]
+
+def test_toxicity_tracker_cns_high():
+    tracker = OxygenToxicityTracker()
+    # At pO2 >= 1.6, limit is 45 min
+    cns = tracker.calculate_cns_contribution(1.7, 4.5)
+    assert pytest.approx(cns) == 10.0
+
 def test_gas_density():
     # Air at 0m: (0.21*1.429 + 0.79*1.251) * 1.013 = ~1.305
     d = calculate_gas_density(0.21, 0.0, 0, 1.013)
