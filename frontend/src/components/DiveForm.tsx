@@ -7,35 +7,29 @@ interface Props {
 }
 
 const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
-  const [gases] = useState<Gas[]>(GASES);
-  const [request, setRequest] = useState<DivePlanRequest>({
-    depth: 45,
-    bottom_time: 20,
-    bottom_gas: 'Tx 21/35',
-    deco_gases: [],
-    gf_low: 50,
-    gf_high: 80,
-    is_ccr: false,
-    setpoint: 1.2,
-    deco_setpoint: 1.2,
-    descent_rate: 20,
-    ascent_rate: 10,
-    force_6m: true,
-    model: 'B',
-  });
+  const [request, setRequest] = useState<DivePlanRequest>(() => {
+    const tx2135 = GASES.find((g: Gas) => g.name === 'Tx 21/35');
+    const air = GASES.find((g: Gas) => g.name === 'Air');
+    const nx32 = GASES.find((g: Gas) => g.name === 'Nx 32');
+    const firstBottom = GASES.find((g: Gas) => g.type === 'bottom');
+    const bestBottom = tx2135 ? 'Tx 21/35' : (air ? 'Air' : (nx32 ? 'Nx 32' : (firstBottom ? firstBottom.name : GASES[0].name)));
 
-  useEffect(() => {
-    if (gases.length > 0) {
-      const tx2135 = gases.find((g: Gas) => g.name === 'Tx 21/35');
-      const air = gases.find((g: Gas) => g.name === 'Air');
-      const nx32 = gases.find((g: Gas) => g.name === 'Nx 32');
-      const firstBottom = gases.find((g: Gas) => g.type === 'bottom');
-      setRequest(prev => ({ 
-        ...prev, 
-        bottom_gas: tx2135 ? 'Tx 21/35' : (air ? 'Air' : (nx32 ? 'Nx 32' : (firstBottom ? firstBottom.name : gases[0].name))) 
-      }));
-    }
-  }, [gases]);
+    return {
+      depth: 45,
+      bottom_time: 20,
+      bottom_gas: bestBottom,
+      deco_gases: [],
+      gf_low: 50,
+      gf_high: 80,
+      is_ccr: false,
+      setpoint: 1.2,
+      deco_setpoint: 1.2,
+      descent_rate: 20,
+      ascent_rate: 10,
+      force_6m: true,
+      model: 'B',
+    };
+  });
 
   useEffect(() => {
     if (request.bottom_gas && 
@@ -49,7 +43,7 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    let val: any = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
+    let val: string | number | boolean = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
     
     if (type === 'number') {
       val = value === '' ? 0 : parseFloat(value);
@@ -83,7 +77,7 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
         <div className="form-group-inline">
           <label>GAS</label>
           <select name="bottom_gas" value={request.bottom_gas} onChange={handleChange}>
-            {gases.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}
+            {GASES.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}
           </select>
         </div>
       </div>
@@ -159,7 +153,7 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
         <div className="form-group-inline">
           <label>DECO</label>
           <div className="gas-pills">
-            {gases.filter(g => g.type === 'deco' || g.name === 'Oxygen').map(g => (
+            {GASES.filter(g => g.type === 'deco' || g.name === 'Oxygen').map(g => (
               <button 
                 key={g.name}
                 className={request.deco_gases.includes(g.name) ? 'active' : ''}

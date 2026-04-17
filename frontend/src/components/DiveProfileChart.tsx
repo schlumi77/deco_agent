@@ -110,6 +110,7 @@ const DiveProfileChart: React.FC<Props> = ({ data }) => {
           <Tooltip 
             contentStyle={{ backgroundColor: '#222', border: '1px solid #444', color: '#fff' }}
             itemStyle={{ color: '#00ffcc' }}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             formatter={(value: any) => [`${value}m`, 'Depth']}
             labelFormatter={(label) => `Time: ${Math.round(Number(label))} min`}
           />

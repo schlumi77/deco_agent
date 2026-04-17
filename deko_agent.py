@@ -100,8 +100,10 @@ def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_
         p_amb_bottom = 1.0 + depth / 10.0
         p_dry_bottom = p_amb_bottom - 0.0627
         dil_po2_bottom = p_dry_bottom * diluent['fO2']
-        if dil_po2_bottom > setpoint - 0.2: # Trigger warning if diluent pO2 is within 0.2 bar of setpoint
-            warnings.append(f"Diluent pO2 too high at bottom: {dil_po2_bottom:.2f} bar (Setpoint {setpoint:.2f} bar)")
+        if dil_po2_bottom > setpoint:
+            warnings.append(f"Diluent pO2 too high at bottom: {dil_po2_bottom:.2f} bar (Exceeds setpoint {setpoint:.2f} bar)")
+        elif dil_po2_bottom > 1.4:
+            warnings.append(f"Diluent pO2 too high at bottom: {dil_po2_bottom:.2f} bar (Max 1.4 bar)")
     else:
         density = calculate_gas_density(diluent['fO2'], diluent['fHe'], depth)
         if density > 6.2:

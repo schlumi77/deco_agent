@@ -1,4 +1,5 @@
 import { DecoEngine, calculateGasDensity } from './deco_engine';
+import type { ScheduleEntry } from '../types';
 
 export interface Gas {
     name: string;
@@ -86,7 +87,11 @@ export function planDive(
         if (setpoint > 1.4) warnings.push(`Bottom setpoint pO2 too high: ${setpoint.toFixed(2)} bar`);
         const p_amb_bottom = 1.0 + depth / 10.0;
         const dil_po2_bottom = (p_amb_bottom - 0.0627) * diluent.fO2;
-        if (dil_po2_bottom > setpoint - 0.2) warnings.push(`Diluent pO2 too high at bottom: ${dil_po2_bottom.toFixed(2)} bar`);
+        if (dil_po2_bottom > setpoint) {
+            warnings.push(`Diluent pO2 too high at bottom: ${dil_po2_bottom.toFixed(2)} bar (Exceeds setpoint ${setpoint.toFixed(2)} bar)`);
+        } else if (dil_po2_bottom > 1.4) {
+            warnings.push(`Diluent pO2 too high at bottom: ${dil_po2_bottom.toFixed(2)} bar (Max 1.4 bar)`);
+        }
     }
     const density = calculateGasDensity(diluent.fO2, diluent.fHe, depth);
     if (density > 6.2) warnings.push(`Bottom gas density too high: ${density.toFixed(1)} g/L`);
@@ -224,7 +229,7 @@ export function planDive(
 }
 
 export function calculateGasConsumption(
-    schedule: any[],
+    schedule: ScheduleEntry[],
     depth: number,
     bottomTime: number,
     bottomGasName: string,

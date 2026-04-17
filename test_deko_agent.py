@@ -146,8 +146,8 @@ def test_plan_ccr_warnings():
     assert any("Bottom setpoint pO2 too high" in w for w in result["warnings"])
     assert any("Deco setpoint pO2 too high" in w for w in result["warnings"])
     
-    # Diluent pO2 too high (30m on Air -> pO2 = 0.84. Setpoint 0.9 -> warning)
-    result_dil = plan_dive_with_engine(engine, 30.0, 5.0, "Air", [], is_ccr=True, setpoint=0.9)
+    # Diluent pO2 too high (30m on Air -> pO2 ~ 0.83. Setpoint 0.8 -> warning)
+    result_dil = plan_dive_with_engine(engine, 30.0, 5.0, "Air", [], is_ccr=True, setpoint=0.8)
     assert any("Diluent pO2 too high at bottom" in w for w in result_dil["warnings"])
 
 def test_load_data_errors():
