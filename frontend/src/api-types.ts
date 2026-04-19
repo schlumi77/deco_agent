@@ -95,6 +95,11 @@ export interface components {
              */
             deco_setpoint: number;
             /**
+             * Deco Gas Setpoint
+             * @default 1.4
+             */
+            deco_gas_setpoint: number;
+            /**
              * Descent Rate
              * @default 20
              */

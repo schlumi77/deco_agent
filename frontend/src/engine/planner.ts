@@ -61,12 +61,14 @@ export function planDive(
     isCcr = false,
     setpoint = 1.2,
     decoSetpoint: number | null = null,
+    decoGasSetpoint: number | null = null,
     descentRate = 20.0,
     ascentRate = 10.0,
     force6m = true,
     model = "C"
 ) {
     const effectiveDecoSetpoint = decoSetpoint ?? setpoint;
+    const effectiveDecoGasSetpoint = decoGasSetpoint ?? 1.4;
     const engine = new DecoEngine(1.013, model);
     const gasesMap = new Map(GASES.map(g => [g.name, g]));
     const diluent = gasesMap.get(bottomGasName);
@@ -85,6 +87,8 @@ export function planDive(
     // Initial checks
     if (isCcr) {
         if (setpoint > 1.4) warnings.push(`Bottom setpoint pO2 too high: ${setpoint.toFixed(2)} bar`);
+        if (effectiveDecoSetpoint > 1.4) warnings.push(`Deco setpoint pO2 too high: ${effectiveDecoSetpoint.toFixed(2)} bar`);
+        if (effectiveDecoGasSetpoint > 1.5) warnings.push(`Deco gas setpoint pO2 too high: ${effectiveDecoGasSetpoint.toFixed(2)} bar`);
         const p_amb_bottom = 1.0 + depth / 10.0;
         const dil_po2_bottom = (p_amb_bottom - 0.0627) * diluent.fO2;
         if (dil_po2_bottom > setpoint) {
@@ -140,8 +144,18 @@ export function planDive(
                 const tTime = getTravelTime(currentDepth, nextD, ascentRate);
                 let fo2, fhe;
                 if (isCcr) {
-                    [fo2, fhe] = getCcrMix((currentDepth + nextD)/2, diluent, effectiveDecoSetpoint);
-                    currentGasName = `CCR SP ${effectiveDecoSetpoint}`;
+                    // Check for diluent switch
+                    let currentDil = diluent;
+                    let currentSp = effectiveDecoSetpoint;
+                    for (const g of decoCandidates) {
+                        if ((currentDepth/10 + 1) * g.fO2 <= 1.6) {
+                            currentDil = g;
+                            currentSp = effectiveDecoGasSetpoint;
+                            break;
+                        }
+                    }
+                    [fo2, fhe] = getCcrMix((currentDepth + nextD)/2, currentDil, currentSp);
+                    currentGasName = currentDil !== diluent ? `CCR ${currentDil.name} SP ${currentSp}` : `CCR SP ${currentSp}`;
                 } else {
                     let bestGas = diluent;
                     for (const g of decoCandidates) {
@@ -162,8 +176,18 @@ export function planDive(
             const tTime = getTravelTime(currentDepth, nextStop, ascentRate);
             let fo2, fhe;
             if (isCcr) {
-                [fo2, fhe] = getCcrMix((currentDepth + nextStop)/2, diluent, effectiveDecoSetpoint);
-                currentGasName = `CCR SP ${effectiveDecoSetpoint}`;
+                // Check for diluent switch
+                let currentDil = diluent;
+                let currentSp = effectiveDecoSetpoint;
+                for (const g of decoCandidates) {
+                    if ((currentDepth/10 + 1) * g.fO2 <= 1.6) {
+                        currentDil = g;
+                        currentSp = effectiveDecoGasSetpoint;
+                        break;
+                    }
+                }
+                [fo2, fhe] = getCcrMix((currentDepth + nextStop)/2, currentDil, currentSp);
+                currentGasName = currentDil !== diluent ? `CCR ${currentDil.name} SP ${currentSp}` : `CCR SP ${currentSp}`;
             } else {
                 let bestGas = diluent;
                 for (const g of decoCandidates) {
@@ -180,8 +204,18 @@ export function planDive(
             // Stay
             let fo2, fhe;
             if (isCcr) {
-                [fo2, fhe] = getCcrMix(currentDepth, diluent, effectiveDecoSetpoint);
-                currentGasName = `CCR SP ${effectiveDecoSetpoint}`;
+                // Check for diluent switch
+                let currentDil = diluent;
+                let currentSp = effectiveDecoSetpoint;
+                for (const g of decoCandidates) {
+                    if ((currentDepth/10 + 1) * g.fO2 <= 1.6) {
+                        currentDil = g;
+                        currentSp = effectiveDecoGasSetpoint;
+                        break;
+                    }
+                }
+                [fo2, fhe] = getCcrMix(currentDepth, currentDil, currentSp);
+                currentGasName = currentDil !== diluent ? `CCR ${currentDil.name} SP ${currentSp}` : `CCR SP ${currentSp}`;
             } else {
                 let bestGas = diluent;
                 for (const g of decoCandidates) {

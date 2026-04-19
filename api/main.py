@@ -55,6 +55,7 @@ def plan_dive(request: DivePlanRequest):
             is_ccr=request.is_ccr,
             setpoint=request.setpoint,
             deco_setpoint=request.deco_setpoint,
+            deco_gas_setpoint=request.deco_gas_setpoint,
             descent_rate=request.descent_rate,
             ascent_rate=request.ascent_rate,
             force_6m=request.force_6m

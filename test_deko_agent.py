@@ -118,6 +118,7 @@ def test_run_planner_cli():
         model = "C"
         setpoint = 1.2
         deco_setpoint = None
+        deco_gas_setpoint = 1.4
         o2_cons = 1.0
         force_6m = True
 
@@ -205,6 +206,7 @@ def test_run_planner_interactive_ccr():
         "ccr", # mode
         "1.3", # setpoint
         "1.3", # deco setpoint
+        "1.4", # deco gas setpoint
         "1.0", # o2 cons
         "30", # gf_low
         "70", # gf_high
@@ -264,6 +266,7 @@ def test_run_planner_high_toxicity_warnings():
         model = "C"
         setpoint = 1.2
         deco_setpoint = None
+        deco_gas_setpoint = 1.4
         o2_cons = 1.0
         force_6m = True
 

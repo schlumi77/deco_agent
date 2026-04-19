@@ -31,6 +31,7 @@ function App() {
           request.is_ccr,
           request.setpoint,
           request.deco_setpoint,
+          request.deco_gas_setpoint,
           request.descent_rate,
           request.ascent_rate,
           request.force_6m,

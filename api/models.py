@@ -17,6 +17,7 @@ class DivePlanRequest(BaseModel):
     is_ccr: bool = False
     setpoint: float = 1.2
     deco_setpoint: float = 1.2
+    deco_gas_setpoint: float = 1.4
     descent_rate: float = 20.0
     ascent_rate: float = 10.0
     force_6m: bool = True

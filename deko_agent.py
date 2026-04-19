@@ -71,9 +71,11 @@ def get_travel_time(d1, d2, asc_rate):
     # Segment crosses 10m boundary
     return (d1 - 10.0) / asc_rate + (10.0 - d2) / 1.0
 
-def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_names, gf_low=0.50, gf_high=0.80, is_ccr=False, setpoint=1.2, deco_setpoint=None, descent_rate=20.0, ascent_rate=10.0, force_6m=True):
+def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_names, gf_low=0.50, gf_high=0.80, is_ccr=False, setpoint=1.2, deco_setpoint=None, deco_gas_setpoint=None, descent_rate=20.0, ascent_rate=10.0, force_6m=True):
     if deco_setpoint is None:
         deco_setpoint = setpoint
+    if deco_gas_setpoint is None:
+        deco_gas_setpoint = 1.4
     
     gases = {g['name']: g for g in load_gases()}
     if bottom_gas_name not in gases:
@@ -95,6 +97,8 @@ def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_
             warnings.append(f"Bottom setpoint pO2 too high: {setpoint:.2f} bar (Max 1.4)")
         if deco_setpoint and deco_setpoint > 1.4:
             warnings.append(f"Deco setpoint pO2 too high: {deco_setpoint:.2f} bar (Max 1.4)")
+        if deco_gas_setpoint and deco_gas_setpoint > 1.5:
+            warnings.append(f"Deco gas setpoint pO2 too high: {deco_gas_setpoint:.2f} bar (Max 1.5)")
             
         # Check if diluent pO2 exceeds setpoint at bottom depth
         p_amb_bottom = 1.0 + depth / 10.0
@@ -183,8 +187,16 @@ def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_
                     travel_time = get_travel_time(current_depth, next_d, ascent_rate)
                     
                     if is_ccr:
-                        fo2, fhe = get_ccr_mix((current_depth + next_d)/2.0, diluent, deco_setpoint)
-                        current_gas_name = f"CCR SP {deco_setpoint}"
+                        # Check for diluent switch
+                        current_dil = diluent
+                        current_sp = deco_setpoint
+                        for g in deco_candidates:
+                            if (current_depth/10.0 + 1.0) * g['fO2'] <= 1.6:
+                                current_dil = g
+                                current_sp = deco_gas_setpoint
+                                break
+                        fo2, fhe = get_ccr_mix((current_depth + next_d)/2.0, current_dil, current_sp)
+                        current_gas_name = f"CCR {current_dil['name']} SP {current_sp}" if current_dil != diluent else f"CCR SP {current_sp}"
                     else:
                         current_gas = diluent
                         for g in deco_candidates:
@@ -215,8 +227,16 @@ def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_
                 # Stay at floor
                 current_depth = floor
                 if is_ccr:
-                    fo2, fhe = get_ccr_mix(floor, diluent, deco_setpoint)
-                    current_gas_name = f"CCR SP {deco_setpoint}"
+                    # Check for diluent switch
+                    current_dil = diluent
+                    current_sp = deco_setpoint
+                    for g in deco_candidates:
+                        if (floor/10.0 + 1.0) * g['fO2'] <= 1.6:
+                            current_dil = g
+                            current_sp = deco_gas_setpoint
+                            break
+                    fo2, fhe = get_ccr_mix(floor, current_dil, current_sp)
+                    current_gas_name = f"CCR {current_dil['name']} SP {current_sp}" if current_dil != diluent else f"CCR SP {current_sp}"
                 else:
                     current_gas = diluent
                     for g in deco_candidates:
@@ -236,8 +256,16 @@ def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_
         if ceiling <= next_stop:
             travel_time = get_travel_time(current_depth, next_stop, ascent_rate)
             if is_ccr:
-                fo2, fhe = get_ccr_mix((current_depth + next_stop)/2.0, diluent, deco_setpoint)
-                current_gas_name = f"CCR SP {deco_setpoint}"
+                # Check for diluent switch
+                current_dil = diluent
+                current_sp = deco_setpoint
+                for g in deco_candidates:
+                    if (current_depth/10.0 + 1.0) * g['fO2'] <= 1.6:
+                        current_dil = g
+                        current_sp = deco_gas_setpoint
+                        break
+                fo2, fhe = get_ccr_mix((current_depth + next_stop)/2.0, current_dil, current_sp)
+                current_gas_name = f"CCR {current_dil['name']} SP {current_sp}" if current_dil != diluent else f"CCR SP {current_sp}"
             else:
                 current_gas = diluent
                 for g in deco_candidates:
@@ -266,8 +294,16 @@ def plan_dive_with_engine(engine, depth, bottom_time, bottom_gas_name, deco_gas_
         else:
             # Must stay at current depth for 1 minute
             if is_ccr:
-                fo2, fhe = get_ccr_mix(current_depth, diluent, deco_setpoint)
-                current_gas_name = f"CCR SP {deco_setpoint}"
+                # Check for diluent switch
+                current_dil = diluent
+                current_sp = deco_setpoint
+                for g in deco_candidates:
+                    if (current_depth/10.0 + 1.0) * g['fO2'] <= 1.6:
+                        current_dil = g
+                        current_sp = deco_gas_setpoint
+                        break
+                fo2, fhe = get_ccr_mix(current_depth, current_dil, current_sp)
+                current_gas_name = f"CCR {current_dil['name']} SP {current_sp}" if current_dil != diluent else f"CCR SP {current_sp}"
             else:
                 current_gas = diluent
                 for g in deco_candidates:
@@ -409,10 +445,12 @@ def run_planner(args=None):
             is_ccr = (mode == "ccr")
             setpoint = 1.2
             deco_setpoint = 1.2
+            deco_gas_setpoint = 1.4
             o2_cons = 1.0
             if is_ccr:
                 setpoint = float(input("Enter Bottom Setpoint (bar) [1.2]: ") or 1.2)
                 deco_setpoint = float(input("Enter Deco Setpoint (bar) [1.2]: ") or 1.2)
+                deco_gas_setpoint = float(input("Enter Deco Gas Switch Setpoint (bar) [1.4]: ") or 1.4)
                 o2_cons = float(input("Enter O2 Cons (L/min) [1.0]: ") or 1.0)
                 
             gf_low = float(input("Enter GF Low [%] [50]: ") or 50) / 100.0
@@ -433,6 +471,7 @@ def run_planner(args=None):
         is_ccr = (args.mode == "ccr")
         setpoint = args.setpoint
         deco_setpoint = args.deco_setpoint or setpoint
+        deco_gas_setpoint = args.deco_gas_setpoint
         o2_cons = args.o2_cons
         # Check if GF is provided in percent or decimal
         gf_low = args.gf_low / 100.0 if args.gf_low > 1.0 else args.gf_low
@@ -448,6 +487,7 @@ def run_planner(args=None):
         result = plan_dive_with_engine(engine, depth, time_at_depth, bottom_gas, deco_gases, 
                                                  gf_low=gf_low, gf_high=gf_high, is_ccr=is_ccr, 
                                                  setpoint=setpoint, deco_setpoint=deco_setpoint, 
+                                                 deco_gas_setpoint=deco_gas_setpoint,
                                                  descent_rate=desc_rate, ascent_rate=asc_rate,
                                                  force_6m=force_6m)
         schedule = result['schedule']
@@ -512,7 +552,8 @@ def main():
     parser.add_argument("--model", choices=["B", "C"], default="C", help="Bühlmann Model B or C (default: C)")
     parser.add_argument("--setpoint", type=float, default=1.2, help="CCR Bottom Setpoint (default: 1.2)")
     parser.add_argument("--deco-setpoint", type=float, help="CCR Deco Setpoint")
-    parser.add_argument("--o2-cons", type=float, default=1.0, help="O2 Consumption L/min (default: 1.0)")
+    parser.add_argument("--deco-gas-setpoint", type=float, default=1.4, help="CCR Deco Gas Switch Setpoint (default: 1.4)")
+    parser.add_argument("--o2-cons", type=float, default=1.0, help="O2 Consumption rate in L/min (default: 1.0)")
     parser.add_argument("--force-6m", action="store_true", default=True, help="Force last deco stop at 6m (default: True)")
     parser.add_argument("--no-force-6m", action="store_false", dest="force_6m", help="Allow last deco stop at 3m")
     parser.add_argument("--interactive", action="store_true", help="Force interactive mode")

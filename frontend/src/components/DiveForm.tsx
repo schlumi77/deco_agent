@@ -24,6 +24,7 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
       is_ccr: false,
       setpoint: 1.2,
       deco_setpoint: 1.2,
+      deco_gas_setpoint: 1.4,
       descent_rate: 20,
       ascent_rate: 10,
       force_6m: true,
@@ -108,6 +109,12 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
               <label>SP D</label>
               <input type="number" inputMode="decimal" name="deco_setpoint" step="0.1" value={request.deco_setpoint} onChange={handleChange} />
             </div>
+            {request.deco_gases.length > 0 && (
+              <div className="form-group-inline">
+                <label>SP DECO GAS</label>
+                <input type="number" inputMode="decimal" name="deco_gas_setpoint" step="0.1" value={request.deco_gas_setpoint} onChange={handleChange} />
+              </div>
+            )}
           </>
         )}
       </div>
