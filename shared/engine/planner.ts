@@ -1,5 +1,6 @@
-import { DecoEngine, calculateGasDensity } from './deco_engine';
-import type { ScheduleEntry } from '../types';
+import { DecoEngine, calculateGasDensity } from './deco_engine.js';
+import type { ScheduleEntry } from '../types.js';
+import gasConfig from '../gas_config.json' assert { type: 'json' };
 
 export interface Gas {
     name: string;
@@ -8,25 +9,17 @@ export interface Gas {
     type: string;
 }
 
-export const GASES: Gas[] = [
-    {name: "Air", fO2: 0.21, fHe: 0.00, type: "bottom"},
-    {name: "Oxygen", fO2: 1.00, fHe: 0.00, type: "deco"},
-    {name: "Tx 50/15", fO2: 0.50, fHe: 0.15, type: "deco"},
-    {name: "Tx 35/35", fO2: 0.35, fHe: 0.35, type: "deco"},
-    {name: "Tx 24/35", fO2: 0.24, fHe: 0.35, type: "deco"},
-    {name: "Tx 17/70", fO2: 0.17, fHe: 0.70, type: "deco"},
-    {name: "Nx 32", fO2: 0.32, fHe: 0.00, type: "bottom"},
-    {name: "Tx 21/35", fO2: 0.21, fHe: 0.35, type: "bottom"},
-    {name: "Tx 18/45", fO2: 0.18, fHe: 0.45, type: "bottom"},
-    {name: "Tx 15/55", fO2: 0.15, fHe: 0.55, type: "bottom"},
-    {name: "Tx 12/65", fO2: 0.12, fHe: 0.65, type: "bottom"},
-    {name: "Tx 10/80", fO2: 0.10, fHe: 0.80, type: "bottom"},
-    {name: "Tx 6/90", fO2: 0.06, fHe: 0.90, type: "bottom"}
-];
+export const GASES: Gas[] = gasConfig as Gas[];
 
 export function calculateMod(fo2: number, maxPo2: number): number {
     if (fo2 <= 0) return Infinity;
     return (maxPo2 / fo2 - 1) * 10;
+}
+
+export function calculateMinOd(fo2: number, minPo2 = 0.16): number {
+    if (fo2 <= 0) return Infinity;
+    const depth = (minPo2 / fo2 - 1) * 10;
+    return Math.max(0, depth);
 }
 
 export function calculateEnd(depth: number, fhe: number): number {
@@ -96,11 +89,14 @@ export function planDive(
         } else if (dil_po2_bottom > 1.4) {
             warnings.push(`Diluent pO2 too high at bottom: ${dil_po2_bottom.toFixed(2)} bar (Max 1.4 bar)`);
         }
+    } else {
+        const density = calculateGasDensity(diluent.fO2, diluent.fHe, depth);
+        if (density > 6.2) warnings.push(`Bottom gas density too high: ${density.toFixed(1)} g/L`);
+        const end = calculateEnd(depth, diluent.fHe);
+        if (end > 30) warnings.push(`Bottom gas END too deep: ${end.toFixed(0)}m`);
+        const po2 = (depth/10.0 + 1.0) * diluent.fO2;
+        if (po2 > 1.4) warnings.push(`Bottom gas pO2 too high: ${po2.toFixed(2)} bar`);
     }
-    const density = calculateGasDensity(diluent.fO2, diluent.fHe, depth);
-    if (density > 6.2) warnings.push(`Bottom gas density too high: ${density.toFixed(1)} g/L`);
-    const end = calculateEnd(depth, diluent.fHe);
-    if (end > 30) warnings.push(`Bottom gas END too deep: ${end.toFixed(0)}m`);
 
     // 1. Descent
     let currentD = 0.0;
@@ -131,11 +127,28 @@ export function planDive(
         return q > firstStop ? depth : q;
     };
 
+    let stuckCounter = 0;
     while (currentDepth > 0) {
+        stuckCounter++;
+        if (stuckCounter > 5000) {
+            warnings.push("Deco stuck: Infinite loop detected");
+            break;
+        }
+
         const gfAtDepth = gfHigh - (gfHigh - gfLow) * (currentDepth / depth);
         const ceiling = engine.getCeiling(gfAtDepth);
         const floor = force6m ? 6.0 : 3.0;
-        const nextStop = currentDepth > floor ? Math.max(floor, (currentDepth % 3 === 0 ? currentDepth - 3 : Math.floor(currentDepth / 3) * 3)) : 0.0;
+        
+        let nextStop;
+        if (currentDepth > floor) {
+            nextStop = Math.max(floor, currentDepth - 3.0);
+            if (currentDepth % 3 !== 0) {
+                nextStop = Math.floor(currentDepth / 3.0) * 3.0;
+                if (nextStop < floor) nextStop = floor;
+            }
+        } else {
+            nextStop = 0.0;
+        }
 
         if (currentDepth <= floor && engine.getCeiling(gfHigh) <= 0) {
             // Final ascent
@@ -144,7 +157,6 @@ export function planDive(
                 const tTime = getTravelTime(currentDepth, nextD, ascentRate);
                 let fo2, fhe;
                 if (isCcr) {
-                    // Check for diluent switch
                     let currentDil = diluent;
                     let currentSp = effectiveDecoSetpoint;
                     for (const g of decoCandidates) {
@@ -176,7 +188,6 @@ export function planDive(
             const tTime = getTravelTime(currentDepth, nextStop, ascentRate);
             let fo2, fhe;
             if (isCcr) {
-                // Check for diluent switch
                 let currentDil = diluent;
                 let currentSp = effectiveDecoSetpoint;
                 for (const g of decoCandidates) {
@@ -200,11 +211,11 @@ export function planDive(
             totalTime += tTime;
             currentDepth = nextStop;
             profile.push({time: totalTime, depth: getDisplayDepth(currentDepth), gas: currentGasName});
+            stuckCounter = 0;
         } else {
             // Stay
             let fo2, fhe;
             if (isCcr) {
-                // Check for diluent switch
                 let currentDil = diluent;
                 let currentSp = effectiveDecoSetpoint;
                 for (const g of decoCandidates) {
@@ -231,7 +242,17 @@ export function planDive(
         }
     }
 
-    const finalSchedule = [];
+    const finalSchedule: ScheduleEntry[] = [];
+    // Always add bottom segment to schedule summary
+    finalSchedule.push({
+        depth, 
+        time: bottomTime, 
+        run_time: Math.round(depth/descentRate + bottomTime), 
+        gas: isCcr ? `CCR SP ${setpoint}` : bottomGasName, 
+        cns: engine.toxicity_tracker.cns_percent, 
+        otu: engine.toxicity_tracker.otus
+    });
+
     if (decoSchedule.length > 0) {
         let [currD, totalStopT, currRT, currG, currC, currO] = decoSchedule[0];
         for (let i = 1; i < decoSchedule.length; i++) {
@@ -250,6 +271,7 @@ export function planDive(
 
     const tissueLoads = engine.getTissueLoads();
     const surfaceGf = Math.max(...tissueLoads.map(l => l.load_percent));
+    if (surfaceGf > 100) warnings.push(`Surfacing with tissue load > 100%: ${surfaceGf.toFixed(1)}%`);
 
     return {
         schedule: finalSchedule,
@@ -280,13 +302,24 @@ export function calculateGasConsumption(
     bailout[bottomGasName] += (depth / 20.0 + 1.0) * dTime * sacRate;
     bailout[bottomGasName] += (depth / 10.0 + 1.0) * bottomTime * sacRate;
     
-    const firstStopD = schedule.length > 0 ? schedule[0].depth : 0;
+    const firstStopD = schedule.length > 1 ? schedule[1].depth : 0;
     const tTimeToFirst = getTravelTime(depth, firstStopD, ascentRate);
     bailout[bottomGasName] += ((depth + firstStopD) / 20.0 + 1.0) * tTimeToFirst * sacRate;
 
-    for (let i = 0; i < schedule.length; i++) {
+    for (let i = 1; i < schedule.length; i++) {
         const s = schedule[i];
-        const gName = s.gas.startsWith("CCR SP") ? bottomGasName : s.gas;
+        // Parse gas name from CCR string if needed
+        let gName = s.gas;
+        if (s.gas.startsWith("CCR ")) {
+            const parts = s.gas.split(" ");
+            if (parts.length > 3 && parts[1] !== "SP") {
+                // CCR Tx 50/15 SP 1.4 -> Tx 50/15
+                gName = parts.slice(1, -2).join(" ");
+            } else {
+                gName = bottomGasName;
+            }
+        }
+        
         if (!bailout[gName]) bailout[gName] = 0;
         bailout[gName] += (s.depth / 10.0 + 1.0) * s.time * sacRate;
         

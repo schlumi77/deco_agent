@@ -1,6 +1,6 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
-import type { TissueLoad } from '../types';
+import type { TissueLoad } from '@shared/types';
 
 interface Props {
   data: TissueLoad[];

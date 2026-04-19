@@ -3,9 +3,9 @@ import './App.css';
 import DiveForm from './components/DiveForm';
 import TissueChart from './components/TissueChart';
 import DiveProfileChart from './components/DiveProfileChart';
-import type { DivePlanRequest, DivePlanResponse } from './types';
+import type { DivePlanResponse, DivePlanRequest } from '@shared/types';
 import { Activity, AlertTriangle, Settings, ChevronUp } from 'lucide-react';
-import { planDive, calculateGasConsumption } from './engine/planner';
+import { planDive, calculateGasConsumption } from '@shared/engine/planner';
 
 function App() {
   const [plan, setPlan] = useState<DivePlanResponse | null>(null);
@@ -114,7 +114,7 @@ function App() {
                 <AlertTriangle size={12} /> SAFETY WARNINGS
               </div>
               <ul className="warning-list">
-                {plan.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                {plan.warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
               </ul>
             </div>
           )}
@@ -141,7 +141,7 @@ function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {plan?.schedule.map((entry, i) => (
+                    {plan?.schedule.map((entry: any, i: number) => (
                       <tr key={i}>
                         <td>{entry.depth}m</td>
                         <td>{entry.time}m</td>
@@ -163,7 +163,7 @@ function App() {
             </div>
             <div className="panel gas-requirements-panel">
               <div className="panel-header-compact">GAS REQUIREMENTS</div>
-              {plan && (
+              {plan && plan.gas_requirements && (
                 <div className="gas-sections-compact">
                   {Object.keys(plan.gas_requirements.onboard).length > 0 && (
                     <div className="gas-group">
@@ -171,7 +171,7 @@ function App() {
                       {Object.entries(plan.gas_requirements.onboard).map(([gas, vol]) => (
                         <div key={gas} className="gas-row">
                           <span>{gas.replace('Onboard ', '')}</span>
-                          <span className="vol">{Math.round(vol)}L</span>
+                          <span className="vol">{Math.round(vol as number)}L</span>
                         </div>
                       ))}
                     </div>
@@ -181,7 +181,7 @@ function App() {
                     {Object.entries(plan.gas_requirements.bailout).map(([gas, vol]) => (
                       <div key={gas} className="gas-row">
                         <span>{gas}</span>
-                        <span className="vol">{Math.round(vol)}L</span>
+                        <span className="vol">{Math.round(vol as number)}L</span>
                       </div>
                     ))}
                   </div>

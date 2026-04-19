@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import type { DivePlanRequest } from '../types';
-import { GASES, type Gas } from '../engine/planner';
+import type { DivePlanRequest } from '@shared/types';
+import { GASES, type Gas } from '@shared/engine/planner';
 
 interface Props {
   onPlanChange: (request: DivePlanRequest) => void;
@@ -50,14 +50,14 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
       val = value === '' ? 0 : parseFloat(value);
     }
     
-    setRequest(prev => ({ ...prev, [name]: val }));
+    setRequest((prev: DivePlanRequest) => ({ ...prev, [name]: val }));
   };
 
   const handleDecoGasToggle = (name: string) => {
-    setRequest(prev => {
+    setRequest((prev: DivePlanRequest) => {
       const exists = prev.deco_gases.includes(name);
       if (exists) {
-        return { ...prev, deco_gases: prev.deco_gases.filter(g => g !== name) };
+        return { ...prev, deco_gases: prev.deco_gases.filter((g: string) => g !== name) };
       } else {
         return { ...prev, deco_gases: [...prev.deco_gases, name] };
       }
@@ -78,7 +78,7 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
         <div className="form-group-inline">
           <label>GAS</label>
           <select name="bottom_gas" value={request.bottom_gas} onChange={handleChange}>
-            {GASES.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}
+            {GASES.map((g: Gas) => <option key={g.name} value={g.name}>{g.name}</option>)}
           </select>
         </div>
       </div>
@@ -91,11 +91,11 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
           <div className="toggle-group compact">
             <button 
               className={!request.is_ccr ? 'active' : ''} 
-              onClick={() => setRequest(p => ({...p, is_ccr: false}))}
+              onClick={() => setRequest((p: DivePlanRequest) => ({...p, is_ccr: false}))}
             >OC</button>
             <button 
               className={request.is_ccr ? 'active' : ''} 
-              onClick={() => setRequest(p => ({...p, is_ccr: true}))}
+              onClick={() => setRequest((p: DivePlanRequest) => ({...p, is_ccr: true}))}
             >CCR</button>
           </div>
         </div>
@@ -157,11 +157,11 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
           <div className="toggle-group compact">
             <button 
               className={!request.force_6m ? 'active' : ''} 
-              onClick={() => setRequest(p => ({...p, force_6m: false}))}
+              onClick={() => setRequest((p: DivePlanRequest) => ({...p, force_6m: false}))}
             >3m</button>
             <button 
               className={request.force_6m ? 'active' : ''} 
-              onClick={() => setRequest(p => ({...p, force_6m: true}))}
+              onClick={() => setRequest((p: DivePlanRequest) => ({...p, force_6m: true}))}
             >6m</button>
           </div>
         </div>
@@ -173,7 +173,7 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
         <div className="form-group-inline">
           <label>DECO</label>
           <div className="gas-pills">
-            {GASES.filter(g => g.type === 'deco' || g.name === 'Oxygen').map(g => (
+            {GASES.filter((g: Gas) => g.type === 'deco' || g.name === 'Oxygen').map((g: Gas) => (
               <button 
                 key={g.name}
                 className={request.deco_gases.includes(g.name) ? 'active' : ''}

@@ -1,0 +1,6 @@
+[
+  {"name": "Oxygen", "volume": 3.0, "pressure": 200, "gas": "Oxygen", "role": "deco"},
+  {"name": "Diluent/Bailout", "volume": 16.5, "pressure": 200, "gas": "Standard Tx", "role": "bottom"},
+  {"name": "Inflation", "volume": 3.0, "pressure": 200, "gas": "Air", "role": "suit"},
+  {"name": "Stage", "volume": 5.4, "pressure": 200, "gas": "Deco Tx", "role": "stage"}
+]

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea, ReferenceLine, Label } from 'recharts';
-import type { ProfileEntry } from '../types';
+import type { ProfileEntry } from '@shared/types';
 
 interface Props {
   data: ProfileEntry[];
