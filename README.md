@@ -1,40 +1,41 @@
-# 🤿 Deco_agent v2.1
+# 🤿 Deco_agent v3.0
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![React 18+](https://img.shields.io/badge/frontend-React%2018%20%2B%20TS-61dafb.svg)](https://react.dev/)
-[![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js->=18.0.0-green.svg)](https://nodejs.org/)
+[![React 19](https://img.shields.io/badge/frontend-React%2019%20%2B%20TS-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/build-Vite-646CFF.svg)](https://vitejs.dev/)
 
-**Deco Agent** is a high-precision technical diving gas management and decompression planning utility. Designed for both **mCCR (mechanical Closed Circuit Rebreather)** and **Open Circuit** diving, it implements the industry-standard **Bühlmann ZHL-16C** decompression model with user-definable **Gradient Factors**.
+**Deco Agent** is a high-precision technical diving gas management and decompression planning utility. Now refactored into a **unified TypeScript codebase**, it provides a single source of truth for decompression math across both CLI and Web platforms. It implements the industry-standard **Bühlmann ZHL-16C** decompression model with user-definable **Gradient Factors**.
 
 ---
 
 ## 🚀 Key Features
 
--   **Bühlmann ZHL-16C Engine**: 16-compartment inert gas tracking (Nitrogen & Helium) using the **Schreiner Equation**.
+-   **Unified ZHL-16C Engine**: Single TypeScript implementation for 16-compartment inert gas tracking (Nitrogen & Helium) using the **Schreiner Equation**.
 -   **Gradient Factors (GF)**: Full control over conservatism (e.g., 50/80) to manage deep stops and surfacing safety.
 -   **Oxygen Toxicity Tracking**: Real-time calculation of **CNS%** (NOAA limits) and **OTUs** (pulmonary toxicity).
 -   **Gas Management & Physics**:
     -   Calculates **MOD**, **MinOD**, **END**, and **Gas Density**.
-    -   Supports **CCR (Constant Setpoint)** and **Open Circuit** planning.
+    -   Supports **mCCR (Constant Setpoint)** and **Open Circuit** planning.
     -   Automated **Bailout Schedule** generation with gas consumption analysis.
 -   **Safety First**:
     -   Integrated warnings for high CNS (>80%), excessive OTUs (>300), and gas volume violations.
     -   **6-meter Decompression Floor**: Enforces a minimum stop depth of 6m for technical safety.
 -   **Modern Web Dashboard**:
-    -   Responsive, mobile-friendly interface (optimized for iOS/Android).
-    -   Interactive **Tissue Saturation Charts** visualizing all 16 compartments.
-    -   Dynamic **Dive Profile Charts** with stop-by-stop gas and CNS tracking.
--   **Unified CLI**: A powerful terminal-based agent for rapid planning and gas checks.
+    -   **Offline-capable** React 19 application running the engine directly in the browser.
+    -   Interactive **Tissue Saturation Charts** and **Dive Profile Charts** (using Recharts).
+-   **Node.js CLI**: A powerful terminal-based agent for rapid planning and gas checks.
 
 ---
 
 ## 🛠 Tech Stack
 
--   **Backend**: Python 3.9+, FastAPI, Pydantic (Strongly typed API).
--   **Frontend**: React 18, TypeScript, Vite, Recharts (Data Visualization).
--   **Physiological Core**: Custom implementation of ZHL-16C, synchronized with **Subsurface** core logic for maximum reliability.
+-   **Language**: 100% TypeScript.
+-   **Runtime**: Node.js (CLI) & Browser (Web).
+-   **Frontend**: React 19, Vite, Recharts, Lucide React.
+-   **Physiological Core**: Custom ZHL-16C implementation in `shared/engine/`.
+-   **Testing**: Vitest for unit and integration testing.
 
 ---
 
@@ -42,9 +43,8 @@
 
 ### Prerequisites
 
--   Python 3.9 or higher
--   Node.js & npm (for the frontend)
--   Virtual environment (recommended)
+-   **Node.js**: version 18.0.0 or higher.
+-   **npm**: version 9.0.0 or higher.
 
 ### Installation
 
@@ -54,106 +54,73 @@
     cd Deco_agent
     ```
 
-2.  **Set up the Backend**:
+2.  **Install dependencies**:
     ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
-    ```
-
-3.  **Set up the Frontend**:
-    ```bash
-    cd frontend
     npm install
-    cd ..
+    # Also install frontend dependencies
+    cd frontend && npm install && cd ..
     ```
 
 ---
 
 ## 🎮 Running the Application
 
-### 1. Unified Web Stack (Recommended)
-Launch the FastAPI backend and Vite frontend simultaneously using the provided orchestration script:
+### 1. Web Dashboard
+Launch the interactive web application:
 ```bash
-chmod +x run_web.sh
-./run_web.sh
+npm run web
 ```
-- **Frontend**: `http://localhost:5173`
-- **Backend API**: `http://localhost:8000`
+The app will be available at `http://localhost:5173`. It runs the decompression engine locally in your browser, making it fully offline-capable once loaded.
 
 ### 2. CLI Agent
-Access the planner directly in your terminal for quick calculations:
+Access the planner directly in your terminal:
 ```bash
-python3 deko_agent.py
+# General planning
+npm run cli -- plan --depth 50 --time 20 --gas Air --mode oc
+
+# See all options
+npm run cli -- --help
 ```
 
 ---
 
-## ✨ Recent Improvements (v2.1)
+## ✨ Recent Improvements (v3.0)
 
--   **Enhanced Input Stability**: Fixed a critical bug where empty numeric inputs (like depth or time) could cause the calculation engine to hang. Inputs now default to safe values or skip calculation until valid.
--   **Mobile Accessibility**:
-    -   Implemented horizontal scrolling for the settings toolbar on mobile devices.
-    -   Responsive dashboard layout where panels stack on narrow screens.
--   **Engine & API Enhancements**:
-    -   Added **Air (21/0)** as a standard gas.
-    -   Improved gas consumption logic to include final ascent segments.
-    -   Added strict finite-number validation in the API.
-
----
-
-## 📚 API Documentation & Type Safety
-
-FastAPI automatically generates interactive Swagger documentation for the API. When the backend is running, visit:
-- **Swagger UI**: `http://localhost:8000/docs`
-
-The frontend leverages `openapi-typescript` to ensure strict type safety that perfectly matches the backend Pydantic models. To regenerate the TypeScript interfaces after modifying the API:
-```bash
-# 1. Dump the OpenAPI schema from the FastAPI backend
-python3 dump_openapi.py
-
-# 2. Generate the types in the frontend
-cd frontend
-npm run generate-api-types
-```
+-   **Unified Architecture**: Removed Python/FastAPI backend in favor of a shared TypeScript engine. This ensures identical calculation results between the CLI and the Web UI.
+-   **React 19 Upgrade**: Leverages the latest React features for a smoother, more responsive dashboard experience.
+-   **Offline-First**: The web application no longer requires a backend server for calculations, allowing for use in remote dive locations.
+-   **Improved Type Safety**: Shared types across the entire stack prevent data inconsistency and improve developer experience.
 
 ---
 
 ## 🧪 Testing
 
-The project includes a comprehensive test suite covering the physiological engine, the dive planner, and the FastAPI endpoints.
+The project uses **Vitest** for comprehensive testing of the physiological engine and planning logic.
 
 ### Running Tests
-Ensure you have the development dependencies installed:
 ```bash
-pip install pytest httpx
+npm run test
 ```
 
-Run all tests:
-```bash
-pytest
-```
-
-The test suite includes:
--   `test_deco_engine.py`: Unit tests for ZHL-16 math, Schreiner equation, and toxicity tracking.
--   `test_deko_agent.py`: Integration tests for the dive planning logic and data loading.
--   `test_api.py`: Functional tests for the FastAPI REST endpoints.
+The test suite covers:
+-   **ZHL-16C Math**: Validation of tissue loading and M-values.
+-   **Schreiner Equation**: Accuracy of gas uptake and elimination during depth changes.
+-   **Planner Logic**: Verification of decompression stop generation and gas consumption.
 
 ---
 
 ## 🏗 Project Structure
 
--   `deco_engine.py`: The physiological core (ZHL-16C math, CNS/OTU tracking, Schreiner logic).
--   `deko_agent.py`: Unified CLI entry point and planning orchestrator.
--   `api/`: FastAPI server implementation.
-    -   `main.py`: Endpoint definitions and request handling.
-    -   `models.py`: Pydantic schemas for dive plans and results.
--   `frontend/src/`: React source code.
-    -   `engine/`: TypeScript implementation of the deco engine for client-side previews.
+-   `shared/engine/`: The physiological core and planning orchestrator.
+    -   `deco_engine.ts`: ZHL-16C math, CNS/OTU tracking, Schreiner logic.
+    -   `planner.ts`: Stop-by-stop planning logic.
+-   `shared/`: Shared configurations and types.
+    -   `types.ts`: TypeScript interfaces used by CLI and Frontend.
+    -   `gas_config.json`: Database of standard diving gases.
+    -   `cylinders.json`: Configuration for common cylinder sizes.
+-   `bin/deco-agent.ts`: Node.js CLI entry point.
+-   `frontend/src/`: React source code, utilizing the shared engine.
     -   `components/`: Reusable UI elements (Charts, Forms).
--   `gas_config.json`: Database of standard diving gases (Air, Nitrox, Trimix).
--   `cylinders.json`: Configuration for common cylinder sizes and volumes.
--   `calculate_all_scenarios.py`: Batch utility for generating multiple dive scenarios.
 
 ---
 
