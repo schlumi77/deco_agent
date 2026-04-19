@@ -145,6 +145,19 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
             <option value="C">ZH-L16C</option>
           </select>
         </div>
+        <div className="form-group-inline">
+          <label>LAST STOP</label>
+          <div className="toggle-group compact">
+            <button 
+              className={!request.force_6m ? 'active' : ''} 
+              onClick={() => setRequest(p => ({...p, force_6m: false}))}
+            >3m</button>
+            <button 
+              className={request.force_6m ? 'active' : ''} 
+              onClick={() => setRequest(p => ({...p, force_6m: true}))}
+            >6m</button>
+          </div>
+        </div>
       </div>
 
       <div className="toolbar-separator" />

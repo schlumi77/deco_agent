@@ -119,6 +119,7 @@ def test_run_planner_cli():
         setpoint = 1.2
         deco_setpoint = None
         o2_cons = 1.0
+        force_6m = True
 
     with patch('sys.stdout', new=io.StringIO()) as fake_out:
         run_planner(Args())
@@ -187,7 +188,8 @@ def test_run_planner_interactive():
         "80", # gf_high
         "20", # desc
         "10", # asc
-        "C"   # model
+        "C",  # model
+        "6m"  # last stop
     ]
     with patch('builtins.input', side_effect=inputs):
         with patch('sys.stdout', new=io.StringIO()) as fake_out:
@@ -208,7 +210,8 @@ def test_run_planner_interactive_ccr():
         "70", # gf_high
         "20", # desc
         "10", # asc
-        "C"   # model
+        "C",  # model
+        "6m"  # last stop
     ]
     with patch('builtins.input', side_effect=inputs):
         with patch('sys.stdout', new=io.StringIO()) as fake_out:
@@ -262,6 +265,7 @@ def test_run_planner_high_toxicity_warnings():
         setpoint = 1.2
         deco_setpoint = None
         o2_cons = 1.0
+        force_6m = True
 
     with patch('sys.stdout', new=io.StringIO()) as fake_out:
         run_planner(Args())

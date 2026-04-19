@@ -421,6 +421,8 @@ def run_planner(args=None):
             desc_rate = float(input("Descent Rate (m/min) [20]: ") or 20)
             asc_rate = float(input("Ascent Rate (m/min) [10]: ") or 10)
             model = input("Decompression Model (B/C) [C]: ") or "C"
+            force_6m_input = input("Last Deco Stop Depth (3m/6m) [6m]: ") or "6m"
+            force_6m = force_6m_input.lower() == "6m"
         except ValueError:
             print("Invalid input.")
             return
@@ -438,6 +440,7 @@ def run_planner(args=None):
         desc_rate = args.desc_rate
         asc_rate = args.asc_rate
         model = args.model
+        force_6m = args.force_6m
 
     deco_gases = ["Oxygen", "Tx 50/15", "Tx 35/35", "Tx 24/35", "Tx 17/70"]
     try:
@@ -445,7 +448,8 @@ def run_planner(args=None):
         result = plan_dive_with_engine(engine, depth, time_at_depth, bottom_gas, deco_gases, 
                                                  gf_low=gf_low, gf_high=gf_high, is_ccr=is_ccr, 
                                                  setpoint=setpoint, deco_setpoint=deco_setpoint, 
-                                                 descent_rate=desc_rate, ascent_rate=asc_rate)
+                                                 descent_rate=desc_rate, ascent_rate=asc_rate,
+                                                 force_6m=force_6m)
         schedule = result['schedule']
         surface_gf = result['surface_gf']
         plan_warnings = result['warnings']
@@ -509,6 +513,8 @@ def main():
     parser.add_argument("--setpoint", type=float, default=1.2, help="CCR Bottom Setpoint (default: 1.2)")
     parser.add_argument("--deco-setpoint", type=float, help="CCR Deco Setpoint")
     parser.add_argument("--o2-cons", type=float, default=1.0, help="O2 Consumption L/min (default: 1.0)")
+    parser.add_argument("--force-6m", action="store_true", default=True, help="Force last deco stop at 6m (default: True)")
+    parser.add_argument("--no-force-6m", action="store_false", dest="force_6m", help="Allow last deco stop at 3m")
     parser.add_argument("--interactive", action="store_true", help="Force interactive mode")
 
     # If any essential planning args are provided, skip the menu unless --interactive is set
