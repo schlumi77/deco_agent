@@ -95,22 +95,6 @@ class DivePlanner {
         return `${prefix} SP ${sp} [${Math.round(fo2 * 100)}/${Math.round(fhe * 100)}]`;
     }
 
-    private getBestGas(d: number): [Gas, number] {
-        if (this.isCcr) {
-            for (const g of this.decoCandidates) {
-                if ((d / 10 + 1) * g.fO2 <= 1.6) {
-                    return [g, this.effectiveDecoGasSetpoint];
-                }
-            }
-            return [this.diluent, this.effectiveDecoSetpoint];
-        } else {
-            for (const g of this.decoCandidates) {
-                if ((d / 10 + 1) * g.fO2 <= 1.6) return [g, 0];
-            }
-            return [this.diluent, 0];
-        }
-    }
-
     private getDisplayDepth(d: number): number {
         const firstStop = Math.floor(this.depth / 3) * 3;
         const q = Math.ceil(Math.round(d * 100) / 100 / 3) * 3;
@@ -160,6 +144,33 @@ class DivePlanner {
         this.profile.push({ time: this.totalTime, depth: this.depth, gas: this.currentGasName });
     }
 
+    private getBestGas(d: number): { gas: Gas; setpoint: number | null } {
+        const candidates = this.isCcr ? this.decoCandidates : this.decoCandidates; // Both use candidates
+        for (const g of this.decoCandidates) {
+            if ((d / 10 + 1) * g.fO2 <= 1.6) {
+                return { 
+                    gas: g, 
+                    setpoint: this.isCcr ? this.effectiveDecoGasSetpoint : null 
+                };
+            }
+        }
+        return { 
+            gas: this.diluent, 
+            setpoint: this.isCcr ? (d === this.depth ? this.setpoint : this.effectiveDecoSetpoint) : null 
+        };
+    }
+
+    private updateGas(depth: number, isTravel = false, nextDepth?: number): [number, number] {
+        const { gas, setpoint } = this.getBestGas(depth);
+        this.currentGasName = this.getGasStable(gas, setpoint);
+        
+        if (this.isCcr && setpoint !== null) {
+            const d = isTravel && nextDepth !== undefined ? (depth + nextDepth) / 2 : depth;
+            return getCcrMix(d, gas, setpoint);
+        }
+        return [gas.fO2, gas.fHe];
+    }
+
     private ascend() {
         let currentDepth = this.depth;
         let stuckCounter = 0;
@@ -193,20 +204,17 @@ class DivePlanner {
 
             if (ceiling <= nextStop) {
                 const tTime = getTravelTime(currentDepth, nextStop, this.ascentRate);
-                const [bestDil, bestSp] = this.getBestGas(currentDepth);
-                const [fo2, fhe] = this.isCcr ? getCcrMix((currentDepth + nextStop) / 2, bestDil, bestSp) : [bestDil.fO2, bestDil.fHe];
+                const [fo2, fhe] = this.updateGas(currentDepth, true, nextStop);
                 
-                this.currentGasName = this.getGasStable(bestDil, this.isCcr ? bestSp : null);
                 this.engine.updateTissues(currentDepth, nextStop, tTime, fo2, fhe);
                 this.totalTime += tTime;
                 currentDepth = nextStop;
                 this.profile.push({ time: this.totalTime, depth: this.getDisplayDepth(currentDepth), gas: this.currentGasName });
                 stuckCounter = 0;
             } else {
-                const [bestDil, bestSp] = this.getBestGas(currentDepth);
-                const [fo2, fhe] = this.isCcr ? getCcrMix(currentDepth, bestDil, bestSp) : [bestDil.fO2, bestDil.fHe];
+                const [fo2, fhe] = this.updateGas(currentDepth);
+                const { gas, setpoint } = this.getBestGas(currentDepth);
 
-                this.currentGasName = this.getGasStable(bestDil, this.isCcr ? bestSp : null);
                 this.engine.updateTissues(currentDepth, currentDepth, 1.0, fo2, fhe);
                 this.totalTime += 1.0;
                 this.profile.push({ time: this.totalTime, depth: this.getDisplayDepth(currentDepth), gas: this.currentGasName });
@@ -214,7 +222,7 @@ class DivePlanner {
                     this.getDisplayDepth(currentDepth), 
                     1.0, 
                     this.totalTime, 
-                    this.getGasDisplay(currentDepth, bestDil, this.isCcr ? bestSp : null), 
+                    this.getGasDisplay(currentDepth, gas, setpoint), 
                     this.engine.toxicity_tracker.cns_percent, 
                     this.engine.toxicity_tracker.otus
                 ]);
@@ -227,10 +235,8 @@ class DivePlanner {
         while (currentDepth > 0) {
             const nextD = Math.max(0, currentDepth - 3);
             const tTime = getTravelTime(currentDepth, nextD, this.ascentRate);
-            const [bestDil, bestSp] = this.getBestGas(currentDepth);
-            const [fo2, fhe] = this.isCcr ? getCcrMix((currentDepth + nextD) / 2, bestDil, bestSp) : [bestDil.fO2, bestDil.fHe];
+            const [fo2, fhe] = this.updateGas(currentDepth, true, nextD);
 
-            this.currentGasName = this.getGasStable(bestDil, this.isCcr ? bestSp : null);
             this.engine.updateTissues(currentDepth, nextD, tTime, fo2, fhe);
             this.totalTime += tTime;
             currentDepth = nextD;

@@ -14,7 +14,7 @@ const program = new Command();
 
 program
   .name('deco-agent')
-  .description('Technical Diving Gas Management and Decompression Planning Utility (ZHL-16C)')
+  .description('Technical Diving Gas Management and Decompression Planning Utility (ZHL-16B/C)')
   .version('3.0.0');
 
 program

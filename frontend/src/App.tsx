@@ -67,7 +67,7 @@ function App() {
       <header className="app-header">
         <div className="logo">
           <Activity size={24} color="#00ffcc" />
-          <h1>DECO AGENT <span className="version">v2.1</span></h1>
+          <h1>DECO AGENT <span className="version">v3.0</span></h1>
         </div>
         <div className="header-controls">
           <div className="status desktop-only">
