@@ -132,7 +132,7 @@ const DiveProfileChart: React.FC<Props> = ({ data }) => {
               strokeWidth={1.5}
             >
               <Label 
-                value={sw.gas} 
+                value={sw.gas.replace(/^CCR /, '')} 
                 position="insideTopLeft" 
                 fill="#ffcc00" 
                 fontSize={10} 

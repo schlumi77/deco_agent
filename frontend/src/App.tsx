@@ -146,7 +146,7 @@ function App() {
                         <td>{entry.depth}m</td>
                         <td>{entry.time}min</td>
                         <td>{entry.run_time}min</td>
-                        <td className="gas-cell">{entry.gas.replace('CCR SP ', 'SP ')}</td>
+                        <td className="gas-cell">{entry.gas.replace(/^CCR /, '')}</td>
                         <td className="desktop-only">{entry.cns.toFixed(0)}%</td>
                       </tr>
                     ))}
