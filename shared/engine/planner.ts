@@ -1,5 +1,5 @@
 import { DecoEngine, calculateGasDensity } from './deco_engine.js';
-import type { ScheduleEntry, Gas } from '../types.js';
+import type { ScheduleEntry, Gas, ProfileEntry, DivePlanResponse } from '../types.js';
 export type { Gas };
 import { GASES } from '../config.js';
 export { GASES };
@@ -37,6 +37,258 @@ export function getTravelTime(d1: number, d2: number, asc_rate: number): number 
     return (d1 - 10.0) / asc_rate + (10.0 - d2) / 1.0;
 }
 
+class DivePlanner {
+    private engine: DecoEngine;
+    private totalTime = 0.0;
+    private profile: ProfileEntry[] = [];
+    private decoSchedule: [number, number, number, string, number, number][] = [];
+    private warnings: string[] = [];
+    private currentGasName: string;
+    private diluent: Gas;
+    private decoCandidates: Gas[];
+    private effectiveDecoSetpoint: number;
+    private effectiveDecoGasSetpoint: number;
+
+    constructor(
+        private depth: number,
+        private bottomTime: number,
+        private bottomGasName: string,
+        private decoGasNames: string[],
+        private gfLow: number,
+        private gfHigh: number,
+        private isCcr: boolean,
+        private setpoint: number,
+        decoSetpoint: number | null,
+        decoGasSetpoint: number | null,
+        private descentRate: number,
+        private ascentRate: number,
+        private force6m: boolean,
+        model: string
+    ) {
+        this.effectiveDecoSetpoint = decoSetpoint ?? setpoint;
+        this.effectiveDecoGasSetpoint = decoGasSetpoint ?? 1.4;
+        this.engine = new DecoEngine(1.013, model);
+        
+        const gasesMap = new Map<string, Gas>(GASES.map(g => [g.name, g]));
+        const dil = gasesMap.get(bottomGasName);
+        if (!dil) throw new Error(`Gas ${bottomGasName} not found`);
+        this.diluent = dil;
+
+        this.decoCandidates = decoGasNames
+            .map(name => gasesMap.get(name))
+            .filter((g): g is Gas => !!g)
+            .sort((a, b) => b.fO2 - a.fO2);
+
+        this.currentGasName = this.getGasStable(this.diluent, isCcr ? setpoint : null);
+    }
+
+    private getGasStable(dil: Gas, sp: number | null): string {
+        if (!this.isCcr || sp === null) return dil.name;
+        const prefix = dil.name === this.diluent.name ? "CCR" : `CCR ${dil.name}`;
+        return `${prefix} SP ${sp}`;
+    }
+
+    private getGasDisplay(d: number, dil: Gas, sp: number | null): string {
+        if (!this.isCcr || sp === null) return dil.name;
+        const [fo2, fhe] = getCcrMix(d, dil, sp);
+        const prefix = dil.name === this.diluent.name ? "CCR" : `CCR ${dil.name}`;
+        return `${prefix} SP ${sp} [${Math.round(fo2 * 100)}/${Math.round(fhe * 100)}]`;
+    }
+
+    private getBestGas(d: number): [Gas, number] {
+        if (this.isCcr) {
+            for (const g of this.decoCandidates) {
+                if ((d / 10 + 1) * g.fO2 <= 1.6) {
+                    return [g, this.effectiveDecoGasSetpoint];
+                }
+            }
+            return [this.diluent, this.effectiveDecoSetpoint];
+        } else {
+            for (const g of this.decoCandidates) {
+                if ((d / 10 + 1) * g.fO2 <= 1.6) return [g, 0];
+            }
+            return [this.diluent, 0];
+        }
+    }
+
+    private getDisplayDepth(d: number): number {
+        const firstStop = Math.floor(this.depth / 3) * 3;
+        const q = Math.ceil(Math.round(d * 100) / 100 / 3) * 3;
+        return q > firstStop ? this.depth : q;
+    }
+
+    private runInitialChecks() {
+        if (this.isCcr) {
+            if (this.setpoint > 1.4) this.warnings.push(`Bottom setpoint pO2 too high: ${this.setpoint.toFixed(2)} bar`);
+            if (this.effectiveDecoSetpoint > 1.4) this.warnings.push(`Deco setpoint pO2 too high: ${this.effectiveDecoSetpoint.toFixed(2)} bar`);
+            if (this.effectiveDecoGasSetpoint > 1.5) this.warnings.push(`Deco gas setpoint pO2 too high: ${this.effectiveDecoGasSetpoint.toFixed(2)} bar`);
+            const p_amb_bottom = 1.0 + this.depth / 10.0;
+            const dil_po2_bottom = (p_amb_bottom - 0.0627) * this.diluent.fO2;
+            if (dil_po2_bottom > this.setpoint) {
+                this.warnings.push(`Diluent pO2 too high at bottom: ${dil_po2_bottom.toFixed(2)} bar (Exceeds setpoint ${this.setpoint.toFixed(2)} bar)`);
+            } else if (dil_po2_bottom > 1.4) {
+                this.warnings.push(`Diluent pO2 too high at bottom: ${dil_po2_bottom.toFixed(2)} bar (Max 1.4 bar)`);
+            }
+        } else {
+            const density = calculateGasDensity(this.diluent.fO2, this.diluent.fHe, this.depth);
+            if (density > 6.2) this.warnings.push(`Bottom gas density too high: ${density.toFixed(1)} g/L`);
+            const end = calculateEnd(this.depth, this.diluent.fHe);
+            if (end > 30) this.warnings.push(`Bottom gas END too deep: ${end.toFixed(0)}m`);
+            const po2 = (this.depth / 10.0 + 1.0) * this.diluent.fO2;
+            if (po2 > 1.4) this.warnings.push(`Bottom gas pO2 too high: ${po2.toFixed(2)} bar`);
+        }
+    }
+
+    private descend() {
+        let currentD = 0.0;
+        this.profile.push({ time: 0.0, depth: 0.0, gas: this.currentGasName });
+        while (currentD < this.depth) {
+            const nextD = Math.min(this.depth, currentD + 3.0);
+            const segmentTime = (nextD - currentD) / this.descentRate;
+            const [fo2, fhe] = this.isCcr ? getCcrMix((currentD + nextD) / 2, this.diluent, this.setpoint) : [this.diluent.fO2, this.diluent.fHe];
+            this.engine.updateTissues(currentD, nextD, segmentTime, fo2, fhe);
+            this.totalTime += segmentTime;
+            currentD = nextD;
+            this.profile.push({ time: this.totalTime, depth: currentD, gas: this.currentGasName });
+        }
+    }
+
+    private stayAtBottom() {
+        const [bfo2, bfhe] = this.isCcr ? getCcrMix(this.depth, this.diluent, this.setpoint) : [this.diluent.fO2, this.diluent.fHe];
+        this.engine.updateTissues(this.depth, this.depth, this.bottomTime, bfo2, bfhe);
+        this.totalTime += this.bottomTime;
+        this.profile.push({ time: this.totalTime, depth: this.depth, gas: this.currentGasName });
+    }
+
+    private ascend() {
+        let currentDepth = this.depth;
+        let stuckCounter = 0;
+        const floor = this.force6m ? 6.0 : 3.0;
+
+        while (currentDepth > 0) {
+            stuckCounter++;
+            if (stuckCounter > 5000) {
+                this.warnings.push("Deco stuck: Infinite loop detected");
+                break;
+            }
+
+            const gfAtDepth = this.gfHigh - (this.gfHigh - this.gfLow) * (currentDepth / this.depth);
+            const ceiling = this.engine.getCeiling(gfAtDepth);
+
+            let nextStop;
+            if (currentDepth > floor) {
+                nextStop = Math.max(floor, currentDepth - 3.0);
+                if (currentDepth % 3 !== 0) {
+                    nextStop = Math.floor(currentDepth / 3.0) * 3.0;
+                    if (nextStop < floor) nextStop = floor;
+                }
+            } else {
+                nextStop = 0.0;
+            }
+
+            if (currentDepth <= floor && this.engine.getCeiling(this.gfHigh) <= 0) {
+                this.finalAscent(currentDepth);
+                break;
+            }
+
+            if (ceiling <= nextStop) {
+                const tTime = getTravelTime(currentDepth, nextStop, this.ascentRate);
+                const [bestDil, bestSp] = this.getBestGas(currentDepth);
+                const [fo2, fhe] = this.isCcr ? getCcrMix((currentDepth + nextStop) / 2, bestDil, bestSp) : [bestDil.fO2, bestDil.fHe];
+                
+                this.currentGasName = this.getGasStable(bestDil, this.isCcr ? bestSp : null);
+                this.engine.updateTissues(currentDepth, nextStop, tTime, fo2, fhe);
+                this.totalTime += tTime;
+                currentDepth = nextStop;
+                this.profile.push({ time: this.totalTime, depth: this.getDisplayDepth(currentDepth), gas: this.currentGasName });
+                stuckCounter = 0;
+            } else {
+                const [bestDil, bestSp] = this.getBestGas(currentDepth);
+                const [fo2, fhe] = this.isCcr ? getCcrMix(currentDepth, bestDil, bestSp) : [bestDil.fO2, bestDil.fHe];
+
+                this.currentGasName = this.getGasStable(bestDil, this.isCcr ? bestSp : null);
+                this.engine.updateTissues(currentDepth, currentDepth, 1.0, fo2, fhe);
+                this.totalTime += 1.0;
+                this.profile.push({ time: this.totalTime, depth: this.getDisplayDepth(currentDepth), gas: this.currentGasName });
+                this.decoSchedule.push([
+                    this.getDisplayDepth(currentDepth), 
+                    1.0, 
+                    this.totalTime, 
+                    this.getGasDisplay(currentDepth, bestDil, this.isCcr ? bestSp : null), 
+                    this.engine.toxicity_tracker.cns_percent, 
+                    this.engine.toxicity_tracker.otus
+                ]);
+            }
+        }
+    }
+
+    private finalAscent(depth: number) {
+        let currentDepth = depth;
+        while (currentDepth > 0) {
+            const nextD = Math.max(0, currentDepth - 3);
+            const tTime = getTravelTime(currentDepth, nextD, this.ascentRate);
+            const [bestDil, bestSp] = this.getBestGas(currentDepth);
+            const [fo2, fhe] = this.isCcr ? getCcrMix((currentDepth + nextD) / 2, bestDil, bestSp) : [bestDil.fO2, bestDil.fHe];
+
+            this.currentGasName = this.getGasStable(bestDil, this.isCcr ? bestSp : null);
+            this.engine.updateTissues(currentDepth, nextD, tTime, fo2, fhe);
+            this.totalTime += tTime;
+            currentDepth = nextD;
+            this.profile.push({ time: this.totalTime, depth: this.getDisplayDepth(currentDepth), gas: this.currentGasName });
+        }
+    }
+
+    private generateResult(): DivePlanResponse {
+        const finalSchedule: ScheduleEntry[] = [];
+        finalSchedule.push({
+            depth: this.depth,
+            time: this.bottomTime,
+            run_time: Math.round(this.depth / this.descentRate + this.bottomTime),
+            gas: this.getGasDisplay(this.depth, this.diluent, this.isCcr ? this.setpoint : null),
+            cns: this.engine.toxicity_tracker.cns_percent,
+            otu: this.engine.toxicity_tracker.otus
+        });
+
+        if (this.decoSchedule.length > 0) {
+            let [currD, totalStopT, currRT, currG, currC, currO] = this.decoSchedule[0];
+            for (let i = 1; i < this.decoSchedule.length; i++) {
+                const [d, t, rt, g, c, o] = this.decoSchedule[i];
+                if (d === currD && g === currG) {
+                    totalStopT += t;
+                    currRT = rt;
+                    currC = c; currO = o;
+                } else {
+                    finalSchedule.push({ depth: currD, time: totalStopT, run_time: Math.round(currRT), gas: currG, cns: currC, otu: currO });
+                    [currD, totalStopT, currRT, currG, currC, currO] = [d, t, rt, g, c, o];
+                }
+            }
+            finalSchedule.push({ depth: currD, time: totalStopT, run_time: Math.round(currRT), gas: currG, cns: currC, otu: currO });
+        }
+
+        const tissueLoads = this.engine.getTissueLoads();
+        const surfaceGf = Math.max(...tissueLoads.map(l => l.load_percent));
+        if (surfaceGf > 100) this.warnings.push(`Surfacing with tissue load > 100%: ${surfaceGf.toFixed(1)}%`);
+
+        return {
+            schedule: finalSchedule,
+            profile: this.profile,
+            tissue_loads: tissueLoads,
+            surface_gf: surfaceGf,
+            warnings: this.warnings,
+            cns_percent: this.engine.toxicity_tracker.cns_percent,
+            otus: this.engine.toxicity_tracker.otus
+        };
+    }
+
+    public plan(): DivePlanResponse {
+        this.runInitialChecks();
+        this.descend();
+        this.stayAtBottom();
+        this.ascend();
+        return this.generateResult();
+    }
+}
+
 export function planDive(
     depth: number,
     bottomTime: number,
@@ -52,245 +304,13 @@ export function planDive(
     ascentRate = 10.0,
     force6m = true,
     model = "C"
-) {
-    const effectiveDecoSetpoint = decoSetpoint ?? setpoint;
-    const effectiveDecoGasSetpoint = decoGasSetpoint ?? 1.4;
-    const engine = new DecoEngine(1.013, model);
-    const gasesMap = new Map<string, Gas>(GASES.map(g => [g.name, g]));
-    const diluent = gasesMap.get(bottomGasName);
-    if (!diluent) throw new Error(`Gas ${bottomGasName} not found`);
-
-    const decoCandidates = decoGasNames
-        .map(name => gasesMap.get(name))
-        .filter((g): g is Gas => !!g)
-        .sort((a, b) => b.fO2 - a.fO2);
-
-    let totalTime = 0.0;
-    const profile: {time: number, depth: number, gas: string}[] = [];
-    const warnings: string[] = [];
-
-    const getGasStable = (dil: Gas, sp: number | null): string => {
-        if (!isCcr || sp === null) return dil.name;
-        const prefix = dil.name === diluent.name ? "CCR" : `CCR ${dil.name}`;
-        return `${prefix} SP ${sp}`;
-    };
-
-    const getGasDisplay = (d: number, dil: Gas, sp: number | null): string => {
-        if (!isCcr || sp === null) return dil.name;
-        const [fo2, fhe] = getCcrMix(d, dil, sp);
-        const prefix = dil.name === diluent.name ? "CCR" : `CCR ${dil.name}`;
-        return `${prefix} SP ${sp} [${Math.round(fo2 * 100)}/${Math.round(fhe * 100)}]`;
-    };
-
-    let currentGasName = getGasStable(diluent, isCcr ? setpoint : null);
-
-    // Initial checks
-    if (isCcr) {
-        if (setpoint > 1.4) warnings.push(`Bottom setpoint pO2 too high: ${setpoint.toFixed(2)} bar`);
-        if (effectiveDecoSetpoint > 1.4) warnings.push(`Deco setpoint pO2 too high: ${effectiveDecoSetpoint.toFixed(2)} bar`);
-        if (effectiveDecoGasSetpoint > 1.5) warnings.push(`Deco gas setpoint pO2 too high: ${effectiveDecoGasSetpoint.toFixed(2)} bar`);
-        const p_amb_bottom = 1.0 + depth / 10.0;
-        const dil_po2_bottom = (p_amb_bottom - 0.0627) * diluent.fO2;
-        if (dil_po2_bottom > setpoint) {
-            warnings.push(`Diluent pO2 too high at bottom: ${dil_po2_bottom.toFixed(2)} bar (Exceeds setpoint ${setpoint.toFixed(2)} bar)`);
-        } else if (dil_po2_bottom > 1.4) {
-            warnings.push(`Diluent pO2 too high at bottom: ${dil_po2_bottom.toFixed(2)} bar (Max 1.4 bar)`);
-        }
-    } else {
-        const density = calculateGasDensity(diluent.fO2, diluent.fHe, depth);
-        if (density > 6.2) warnings.push(`Bottom gas density too high: ${density.toFixed(1)} g/L`);
-        const end = calculateEnd(depth, diluent.fHe);
-        if (end > 30) warnings.push(`Bottom gas END too deep: ${end.toFixed(0)}m`);
-        const po2 = (depth/10.0 + 1.0) * diluent.fO2;
-        if (po2 > 1.4) warnings.push(`Bottom gas pO2 too high: ${po2.toFixed(2)} bar`);
-    }
-
-    // 1. Descent
-    let currentD = 0.0;
-    profile.push({time: 0.0, depth: 0.0, gas: currentGasName});
-    while (currentD < depth) {
-        const nextD = Math.min(depth, currentD + 3.0);
-        const segmentTime = (nextD - currentD) / descentRate;
-        const [fo2, fhe] = isCcr ? getCcrMix((currentD + nextD)/2, diluent, setpoint) : [diluent.fO2, diluent.fHe];
-        engine.updateTissues(currentD, nextD, segmentTime, fo2, fhe);
-        totalTime += segmentTime;
-        currentD = nextD;
-        profile.push({time: totalTime, depth: currentD, gas: currentGasName});
-    }
-
-    // 2. Bottom Time
-    const [bfo2, bfhe] = isCcr ? getCcrMix(depth, diluent, setpoint) : [diluent.fO2, diluent.fHe];
-    engine.updateTissues(depth, depth, bottomTime, bfo2, bfhe);
-    totalTime += bottomTime;
-    profile.push({time: totalTime, depth: depth, gas: currentGasName});
-
-    // 3. Ascent
-    let currentDepth = depth;
-    const decoSchedule: [number, number, number, string, number, number][] = [];
-
-    const getDisplayDepth = (d: number) => {
-        const firstStop = Math.floor(depth / 3) * 3;
-        const q = Math.ceil(Math.round(d * 100) / 100 / 3) * 3;
-        return q > firstStop ? depth : q;
-    };
-
-    let stuckCounter = 0;
-    while (currentDepth > 0) {
-        stuckCounter++;
-        if (stuckCounter > 5000) {
-            warnings.push("Deco stuck: Infinite loop detected");
-            break;
-        }
-
-        const gfAtDepth = gfHigh - (gfHigh - gfLow) * (currentDepth / depth);
-        const ceiling = engine.getCeiling(gfAtDepth);
-        const floor = force6m ? 6.0 : 3.0;
-        
-        let nextStop;
-        if (currentDepth > floor) {
-            nextStop = Math.max(floor, currentDepth - 3.0);
-            if (currentDepth % 3 !== 0) {
-                nextStop = Math.floor(currentDepth / 3.0) * 3.0;
-                if (nextStop < floor) nextStop = floor;
-            }
-        } else {
-            nextStop = 0.0;
-        }
-
-        if (currentDepth <= floor && engine.getCeiling(gfHigh) <= 0) {
-            // Final ascent
-            while (currentDepth > 0) {
-                const nextD = Math.max(0, currentDepth - 3);
-                const tTime = getTravelTime(currentDepth, nextD, ascentRate);
-                let fo2, fhe;
-                if (isCcr) {
-                    let currentDil = diluent;
-                    let currentSp = effectiveDecoSetpoint;
-                    for (const g of decoCandidates) {
-                        if ((currentDepth/10 + 1) * g.fO2 <= 1.6) {
-                            currentDil = g;
-                            currentSp = effectiveDecoGasSetpoint;
-                            break;
-                        }
-                    }
-                    [fo2, fhe] = getCcrMix((currentDepth + nextD)/2, currentDil, currentSp);
-                    currentGasName = getGasStable(currentDil, currentSp);
-                } else {
-                    let bestGas = diluent;
-                    for (const g of decoCandidates) {
-                        if ((currentDepth/10 + 1) * g.fO2 <= 1.6) { bestGas = g; break; }
-                    }
-                    [fo2, fhe] = [bestGas.fO2, bestGas.fHe];
-                    currentGasName = bestGas.name;
-                }
-                engine.updateTissues(currentDepth, nextD, tTime, fo2, fhe);
-                totalTime += tTime;
-                currentDepth = nextD;
-                profile.push({time: totalTime, depth: getDisplayDepth(currentDepth), gas: currentGasName});
-            }
-            break;
-        }
-
-        if (ceiling <= nextStop) {
-            const tTime = getTravelTime(currentDepth, nextStop, ascentRate);
-            let fo2, fhe;
-            if (isCcr) {
-                let currentDil = diluent;
-                let currentSp = effectiveDecoSetpoint;
-                for (const g of decoCandidates) {
-                    if ((currentDepth/10 + 1) * g.fO2 <= 1.6) {
-                        currentDil = g;
-                        currentSp = effectiveDecoGasSetpoint;
-                        break;
-                    }
-                }
-                [fo2, fhe] = getCcrMix((currentDepth + nextStop)/2, currentDil, currentSp);
-                currentGasName = getGasStable(currentDil, currentSp);
-            } else {
-                let bestGas = diluent;
-                for (const g of decoCandidates) {
-                    if ((currentDepth/10 + 1) * g.fO2 <= 1.6) { bestGas = g; break; }
-                }
-                [fo2, fhe] = [bestGas.fO2, bestGas.fHe];
-                currentGasName = bestGas.name;
-            }
-            engine.updateTissues(currentDepth, nextStop, tTime, fo2, fhe);
-            totalTime += tTime;
-            currentDepth = nextStop;
-            profile.push({time: totalTime, depth: getDisplayDepth(currentDepth), gas: currentGasName});
-            stuckCounter = 0;
-        } else {
-            // Stay
-            let fo2, fhe;
-            let currentDil = diluent;
-            let currentSp: number | null = null;
-            if (isCcr) {
-                currentSp = effectiveDecoSetpoint;
-                for (const g of decoCandidates) {
-                    if ((currentDepth/10 + 1) * g.fO2 <= 1.6) {
-                        currentDil = g;
-                        currentSp = effectiveDecoGasSetpoint;
-                        break;
-                    }
-                }
-                [fo2, fhe] = getCcrMix(currentDepth, currentDil, currentSp);
-                currentGasName = getGasStable(currentDil, currentSp);
-            } else {
-                let bestGas = diluent;
-                for (const g of decoCandidates) {
-                    if ((currentDepth/10 + 1) * g.fO2 <= 1.6) { bestGas = g; break; }
-                }
-                [fo2, fhe] = [bestGas.fO2, bestGas.fHe];
-                currentDil = bestGas;
-                currentGasName = bestGas.name;
-            }
-            engine.updateTissues(currentDepth, currentDepth, 1.0, fo2, fhe);
-            totalTime += 1.0;
-            profile.push({time: totalTime, depth: getDisplayDepth(currentDepth), gas: currentGasName});
-            decoSchedule.push([getDisplayDepth(currentDepth), 1.0, totalTime, getGasDisplay(currentDepth, currentDil, currentSp), engine.toxicity_tracker.cns_percent, engine.toxicity_tracker.otus]);
-        }
-    }
-
-    const finalSchedule: ScheduleEntry[] = [];
-    // Always add bottom segment to schedule summary
-    finalSchedule.push({
-        depth, 
-        time: bottomTime, 
-        run_time: Math.round(depth/descentRate + bottomTime), 
-        gas: getGasDisplay(depth, diluent, isCcr ? setpoint : null), 
-        cns: engine.toxicity_tracker.cns_percent, 
-        otu: engine.toxicity_tracker.otus
-    });
-
-    if (decoSchedule.length > 0) {
-        let [currD, totalStopT, currRT, currG, currC, currO] = decoSchedule[0];
-        for (let i = 1; i < decoSchedule.length; i++) {
-            const [d, t, rt, g, c, o] = decoSchedule[i];
-            if (d === currD && g === currG) {
-                totalStopT += t;
-                currRT = rt;
-                currC = c; currO = o;
-            } else {
-                finalSchedule.push({depth: currD, time: totalStopT, run_time: Math.round(currRT), gas: currG, cns: currC, otu: currO});
-                [currD, totalStopT, currRT, currG, currC, currO] = [d, t, rt, g, c, o];
-            }
-        }
-        finalSchedule.push({depth: currD, time: totalStopT, run_time: Math.round(currRT), gas: currG, cns: currC, otu: currO});
-    }
-
-    const tissueLoads = engine.getTissueLoads();
-    const surfaceGf = Math.max(...tissueLoads.map(l => l.load_percent));
-    if (surfaceGf > 100) warnings.push(`Surfacing with tissue load > 100%: ${surfaceGf.toFixed(1)}%`);
-
-    return {
-        schedule: finalSchedule,
-        profile,
-        tissue_loads: tissueLoads,
-        surface_gf: surfaceGf,
-        warnings,
-        cns_percent: engine.toxicity_tracker.cns_percent,
-        otus: engine.toxicity_tracker.otus
-    };
+): DivePlanResponse {
+    const planner = new DivePlanner(
+        depth, bottomTime, bottomGasName, decoGasNames,
+        gfLow, gfHigh, isCcr, setpoint, decoSetpoint, decoGasSetpoint,
+        descentRate, ascentRate, force6m, model
+    );
+    return planner.plan();
 }
 
 export function calculateGasConsumption(
