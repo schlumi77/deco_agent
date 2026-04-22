@@ -75,7 +75,21 @@ export function planDive(
     let totalTime = 0.0;
     const profile: {time: number, depth: number, gas: string}[] = [];
     const warnings: string[] = [];
-    let currentGasName = isCcr ? `CCR SP ${setpoint}` : bottomGasName;
+
+    const getGasStable = (dil: Gas, sp: number | null): string => {
+        if (!isCcr || sp === null) return dil.name;
+        const prefix = dil.name === diluent.name ? "CCR" : `CCR ${dil.name}`;
+        return `${prefix} SP ${sp}`;
+    };
+
+    const getGasDisplay = (d: number, dil: Gas, sp: number | null): string => {
+        if (!isCcr || sp === null) return dil.name;
+        const [fo2, fhe] = getCcrMix(d, dil, sp);
+        const prefix = dil.name === diluent.name ? "CCR" : `CCR ${dil.name}`;
+        return `${prefix} SP ${sp} [${Math.round(fo2 * 100)}/${Math.round(fhe * 100)}]`;
+    };
+
+    let currentGasName = getGasStable(diluent, isCcr ? setpoint : null);
 
     // Initial checks
     if (isCcr) {
@@ -167,7 +181,7 @@ export function planDive(
                         }
                     }
                     [fo2, fhe] = getCcrMix((currentDepth + nextD)/2, currentDil, currentSp);
-                    currentGasName = currentDil !== diluent ? `CCR ${currentDil.name} SP ${currentSp}` : `CCR SP ${currentSp}`;
+                    currentGasName = getGasStable(currentDil, currentSp);
                 } else {
                     let bestGas = diluent;
                     for (const g of decoCandidates) {
@@ -198,7 +212,7 @@ export function planDive(
                     }
                 }
                 [fo2, fhe] = getCcrMix((currentDepth + nextStop)/2, currentDil, currentSp);
-                currentGasName = currentDil !== diluent ? `CCR ${currentDil.name} SP ${currentSp}` : `CCR SP ${currentSp}`;
+                currentGasName = getGasStable(currentDil, currentSp);
             } else {
                 let bestGas = diluent;
                 for (const g of decoCandidates) {
@@ -215,9 +229,10 @@ export function planDive(
         } else {
             // Stay
             let fo2, fhe;
+            let currentDil = diluent;
+            let currentSp: number | null = null;
             if (isCcr) {
-                let currentDil = diluent;
-                let currentSp = effectiveDecoSetpoint;
+                currentSp = effectiveDecoSetpoint;
                 for (const g of decoCandidates) {
                     if ((currentDepth/10 + 1) * g.fO2 <= 1.6) {
                         currentDil = g;
@@ -226,19 +241,20 @@ export function planDive(
                     }
                 }
                 [fo2, fhe] = getCcrMix(currentDepth, currentDil, currentSp);
-                currentGasName = currentDil !== diluent ? `CCR ${currentDil.name} SP ${currentSp}` : `CCR SP ${currentSp}`;
+                currentGasName = getGasStable(currentDil, currentSp);
             } else {
                 let bestGas = diluent;
                 for (const g of decoCandidates) {
                     if ((currentDepth/10 + 1) * g.fO2 <= 1.6) { bestGas = g; break; }
                 }
                 [fo2, fhe] = [bestGas.fO2, bestGas.fHe];
+                currentDil = bestGas;
                 currentGasName = bestGas.name;
             }
             engine.updateTissues(currentDepth, currentDepth, 1.0, fo2, fhe);
             totalTime += 1.0;
             profile.push({time: totalTime, depth: getDisplayDepth(currentDepth), gas: currentGasName});
-            decoSchedule.push([getDisplayDepth(currentDepth), 1.0, totalTime, currentGasName, engine.toxicity_tracker.cns_percent, engine.toxicity_tracker.otus]);
+            decoSchedule.push([getDisplayDepth(currentDepth), 1.0, totalTime, getGasDisplay(currentDepth, currentDil, currentSp), engine.toxicity_tracker.cns_percent, engine.toxicity_tracker.otus]);
         }
     }
 
@@ -248,7 +264,7 @@ export function planDive(
         depth, 
         time: bottomTime, 
         run_time: Math.round(depth/descentRate + bottomTime), 
-        gas: isCcr ? `CCR SP ${setpoint}` : bottomGasName, 
+        gas: getGasDisplay(depth, diluent, isCcr ? setpoint : null), 
         cns: engine.toxicity_tracker.cns_percent, 
         otu: engine.toxicity_tracker.otus
     });
@@ -312,9 +328,10 @@ export function calculateGasConsumption(
         let gName = s.gas;
         if (s.gas.startsWith("CCR ")) {
             const parts = s.gas.split(" ");
-            if (parts.length > 3 && parts[1] !== "SP") {
-                // CCR Tx 50/15 SP 1.4 -> Tx 50/15
-                gName = parts.slice(1, -2).join(" ");
+            const spIndex = parts.indexOf("SP");
+            if (spIndex > 1) {
+                // CCR Tx 50/15 SP 1.4 [10/50] -> Tx 50/15
+                gName = parts.slice(1, spIndex).join(" ");
             } else {
                 gName = bottomGasName;
             }

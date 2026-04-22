@@ -9,7 +9,7 @@
   "scripts": {
     "cli": "tsx bin/deco-agent.ts",
     "web": "cd frontend && npm run dev",
-    "build:cli": "tsc bin/deco-agent.ts --outDir dist --module esnext --target esnext --moduleResolution node",
+    "build:cli": "tsc bin/deco-agent.ts --outDir dist --module esnext --target esnext --moduleResolution node --resolveJsonModule --esModuleInterop --allowSyntheticDefaultImports",
     "test": "vitest"
   },
   "dependencies": {
