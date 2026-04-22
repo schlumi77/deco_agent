@@ -49,22 +49,42 @@ class DivePlanner {
     private effectiveDecoSetpoint: number;
     private effectiveDecoGasSetpoint: number;
 
+    private depth: number;
+    private bottomTime: number;
+    private gfLow: number;
+    private gfHigh: number;
+    private isCcr: boolean;
+    private setpoint: number;
+    private descentRate: number;
+    private ascentRate: number;
+    private force6m: boolean;
+
     constructor(
-        private depth: number,
-        private bottomTime: number,
-        private bottomGasName: string,
-        private decoGasNames: string[],
-        private gfLow: number,
-        private gfHigh: number,
-        private isCcr: boolean,
-        private setpoint: number,
+        depth: number,
+        bottomTime: number,
+        bottomGasName: string,
+        decoGasNames: string[],
+        gfLow: number,
+        gfHigh: number,
+        isCcr: boolean,
+        setpoint: number,
         decoSetpoint: number | null,
         decoGasSetpoint: number | null,
-        private descentRate: number,
-        private ascentRate: number,
-        private force6m: boolean,
+        descentRate: number,
+        ascentRate: number,
+        force6m: boolean,
         model: string
     ) {
+        this.depth = depth;
+        this.bottomTime = bottomTime;
+        this.gfLow = gfLow;
+        this.gfHigh = gfHigh;
+        this.isCcr = isCcr;
+        this.setpoint = setpoint;
+        this.descentRate = descentRate;
+        this.ascentRate = ascentRate;
+        this.force6m = force6m;
+
         this.effectiveDecoSetpoint = decoSetpoint ?? setpoint;
         this.effectiveDecoGasSetpoint = decoGasSetpoint ?? 1.4;
         this.engine = new DecoEngine(1.013, model);
@@ -145,7 +165,6 @@ class DivePlanner {
     }
 
     private getBestGas(d: number): { gas: Gas; setpoint: number | null } {
-        const candidates = this.isCcr ? this.decoCandidates : this.decoCandidates; // Both use candidates
         for (const g of this.decoCandidates) {
             if ((d / 10 + 1) * g.fO2 <= 1.6) {
                 return { 
