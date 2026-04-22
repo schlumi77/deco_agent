@@ -1,15 +1,8 @@
 import { DecoEngine, calculateGasDensity } from './deco_engine.js';
-import type { ScheduleEntry } from '../types.js';
-import gasConfig from '../gas_config.json' assert { type: 'json' };
-
-export interface Gas {
-    name: string;
-    fO2: number;
-    fHe: number;
-    type: string;
-}
-
-export const GASES: Gas[] = gasConfig as Gas[];
+import type { ScheduleEntry, Gas } from '../types.js';
+export type { Gas };
+import { GASES } from '../config.js';
+export { GASES };
 
 export function calculateMod(fo2: number, maxPo2: number): number {
     if (fo2 <= 0) return Infinity;
@@ -63,7 +56,7 @@ export function planDive(
     const effectiveDecoSetpoint = decoSetpoint ?? setpoint;
     const effectiveDecoGasSetpoint = decoGasSetpoint ?? 1.4;
     const engine = new DecoEngine(1.013, model);
-    const gasesMap = new Map(GASES.map(g => [g.name, g]));
+    const gasesMap = new Map<string, Gas>(GASES.map(g => [g.name, g]));
     const diluent = gasesMap.get(bottomGasName);
     if (!diluent) throw new Error(`Gas ${bottomGasName} not found`);
 

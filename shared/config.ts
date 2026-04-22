@@ -1,0 +1,32 @@
+import type { Gas } from './types.js';
+
+export interface Cylinder {
+    name: string;
+    volume: number;
+    pressure: number;
+    gas: string;
+    role: string;
+}
+
+export const GASES: Gas[] = [
+    {"name": "Air", "fO2": 0.21, "fHe": 0.00, "type": "bottom"},
+    {"name": "Oxygen", "fO2": 1.00, "fHe": 0.00, "type": "deco"},
+    {"name": "Tx 50/15", "fO2": 0.50, "fHe": 0.15, "type": "deco"},
+    {"name": "Tx 35/35", "fO2": 0.35, "fHe": 0.35, "type": "deco"},
+    {"name": "Tx 24/35", "fO2": 0.24, "fHe": 0.35, "type": "deco"},
+    {"name": "Tx 17/70", "fO2": 0.17, "fHe": 0.70, "type": "deco"},
+    {"name": "Nx 32", "fO2": 0.32, "fHe": 0.00, "type": "bottom"},
+    {"name": "Tx 21/35", "fO2": 0.21, "fHe": 0.35, "type": "bottom"},
+    {"name": "Tx 18/45", "fO2": 0.18, "fHe": 0.45, "type": "bottom"},
+    {"name": "Tx 15/55", "fO2": 0.15, "fHe": 0.55, "type": "bottom"},
+    {"name": "Tx 12/65", "fO2": 0.12, "fHe": 0.65, "type": "bottom"},
+    {"name": "Tx 10/80", "fO2": 0.10, "fHe": 0.80, "type": "bottom"},
+    {"name": "Tx 6/90", "fO2": 0.06, "fHe": 0.90, "type": "bottom"}
+];
+
+export const CYLINDERS: Cylinder[] = [
+    {"name": "Oxygen", "volume": 3.0, "pressure": 200, "gas": "Oxygen", "role": "deco"},
+    {"name": "Diluent/Bailout", "volume": 16.5, "pressure": 200, "gas": "Standard Tx", "role": "bottom"},
+    {"name": "Inflation", "volume": 3.0, "pressure": 200, "gas": "Air", "role": "suit"},
+    {"name": "Stage", "volume": 5.4, "pressure": 200, "gas": "Deco Tx", "role": "stage"}
+];
