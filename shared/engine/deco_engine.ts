@@ -41,6 +41,12 @@ export const ZHL16C_COMPARTMENTS: number[][] = [
 
 export const WATER_VAPOR_PRESSURE = 0.0627; // bar @ 37C
 
+// Atmospheric pressure at sea level (bar). Single source of truth for the
+// surface pressure used throughout the engine and planner so that the tissue
+// model, breathing-gas mixes, and gas-limit calculations all agree. Depth is
+// converted at 10 msw = 1 bar, so absolute pressure = SURFACE_PRESSURE + depth/10.
+export const SURFACE_PRESSURE = 1.013;
+
 export class OxygenToxicityTracker {
     NOAA_LIMITS = [
         [0.6, 720], [0.7, 570], [0.8, 450], [0.9, 360], [1.0, 300],
@@ -92,7 +98,7 @@ export class DecoEngine {
     p_he: number[];
     toxicity_tracker: OxygenToxicityTracker;
 
-    constructor(surface_pressure = 1.013, model = "C") {
+    constructor(surface_pressure = SURFACE_PRESSURE, model = "C") {
         this.surface_pressure = surface_pressure;
         this.model = model.toUpperCase();
         this.compartments = this.model === "B" ? ZHL16B_COMPARTMENTS : ZHL16C_COMPARTMENTS;
@@ -173,7 +179,7 @@ export class DecoEngine {
     }
 }
 
-export function calculateGasDensity(fo2: number, fhe: number, depth: number, surface_pressure = 1.013): number {
+export function calculateGasDensity(fo2: number, fhe: number, depth: number, surface_pressure = SURFACE_PRESSURE): number {
     const fn2 = 1.0 - fo2 - fhe;
     const p_amb = surface_pressure + depth / 10.0;
     return (fo2 * 1.429 + fhe * 0.1786 + fn2 * 1.251) * p_amb;

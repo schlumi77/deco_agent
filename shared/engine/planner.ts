@@ -1,28 +1,28 @@
-import { DecoEngine, calculateGasDensity } from './deco_engine.js';
+import { DecoEngine, calculateGasDensity, SURFACE_PRESSURE, WATER_VAPOR_PRESSURE } from './deco_engine.js';
 import type { ScheduleEntry, Gas, ProfileEntry, DivePlanResponse } from '../types.js';
 export type { Gas };
 import { GASES } from '../config.js';
 export { GASES };
 
-export function calculateMod(fo2: number, maxPo2: number): number {
+export function calculateMod(fo2: number, maxPo2: number, surfacePressure = SURFACE_PRESSURE): number {
     if (fo2 <= 0) return Infinity;
-    return (maxPo2 / fo2 - 1) * 10;
+    return (maxPo2 / fo2 - surfacePressure) * 10;
 }
 
-export function calculateMinOd(fo2: number, minPo2 = 0.16): number {
+export function calculateMinOd(fo2: number, minPo2 = 0.16, surfacePressure = SURFACE_PRESSURE): number {
     if (fo2 <= 0) return Infinity;
-    const depth = (minPo2 / fo2 - 1) * 10;
+    const depth = (minPo2 / fo2 - surfacePressure) * 10;
     return Math.max(0, depth);
 }
 
-export function calculateEnd(depth: number, fhe: number): number {
-    return (depth + 10) * (1 - fhe) - 10;
+export function calculateEnd(depth: number, fhe: number, surfacePressure = SURFACE_PRESSURE): number {
+    const p_amb = surfacePressure + depth / 10.0;
+    return (p_amb * (1 - fhe) - surfacePressure) * 10;
 }
 
-export function getCcrMix(depth: number, dil: Gas, sp: number): [number, number] {
-    const p_amb = 1.0 + depth / 10.0;
-    const p_h2o = 0.0627;
-    const p_dry_total = p_amb - p_h2o;
+export function getCcrMix(depth: number, dil: Gas, sp: number, surfacePressure = SURFACE_PRESSURE): [number, number] {
+    const p_amb = surfacePressure + depth / 10.0;
+    const p_dry_total = p_amb - WATER_VAPOR_PRESSURE;
     const fo2_loop = Math.max(dil.fO2, sp / p_dry_total);
     const f_inert_total = 1.0 - fo2_loop;
     const f_inert_dil = 1.0 - dil.fO2;
@@ -49,6 +49,7 @@ class DivePlanner {
     private effectiveDecoSetpoint: number;
     private effectiveDecoGasSetpoint: number;
 
+    private surfacePressure: number;
     private depth: number;
     private bottomTime: number;
     private gfLow: number;
@@ -87,8 +88,9 @@ class DivePlanner {
 
         this.effectiveDecoSetpoint = decoSetpoint ?? setpoint;
         this.effectiveDecoGasSetpoint = decoGasSetpoint ?? 1.4;
-        this.engine = new DecoEngine(1.013, model);
-        
+        this.engine = new DecoEngine(SURFACE_PRESSURE, model);
+        this.surfacePressure = this.engine.surface_pressure;
+
         const gasesMap = new Map<string, Gas>(GASES.map(g => [g.name, g]));
         const dil = gasesMap.get(bottomGasName);
         if (!dil) throw new Error(`Gas ${bottomGasName} not found`);
@@ -110,7 +112,7 @@ class DivePlanner {
 
     private getGasDisplay(d: number, dil: Gas, sp: number | null): string {
         if (!this.isCcr || sp === null) return dil.name;
-        const [fo2, fhe] = getCcrMix(d, dil, sp);
+        const [fo2, fhe] = getCcrMix(d, dil, sp, this.surfacePressure);
         const prefix = dil.name === this.diluent.name ? "CCR" : `CCR ${dil.name}`;
         return `${prefix} SP ${sp} [${Math.round(fo2 * 100)}/${Math.round(fhe * 100)}]`;
     }
@@ -126,8 +128,8 @@ class DivePlanner {
             if (this.setpoint > 1.4) this.warnings.push(`Bottom setpoint pO2 too high: ${this.setpoint.toFixed(2)} bar`);
             if (this.effectiveDecoSetpoint > 1.4) this.warnings.push(`Deco setpoint pO2 too high: ${this.effectiveDecoSetpoint.toFixed(2)} bar`);
             if (this.effectiveDecoGasSetpoint > 1.5) this.warnings.push(`Deco gas setpoint pO2 too high: ${this.effectiveDecoGasSetpoint.toFixed(2)} bar`);
-            const p_amb_bottom = 1.0 + this.depth / 10.0;
-            const dil_po2_bottom = (p_amb_bottom - 0.0627) * this.diluent.fO2;
+            const p_amb_bottom = this.surfacePressure + this.depth / 10.0;
+            const dil_po2_bottom = (p_amb_bottom - WATER_VAPOR_PRESSURE) * this.diluent.fO2;
             if (dil_po2_bottom > this.setpoint) {
                 this.warnings.push(`Diluent pO2 too high at bottom: ${dil_po2_bottom.toFixed(2)} bar (Exceeds setpoint ${this.setpoint.toFixed(2)} bar)`);
             } else if (dil_po2_bottom > 1.4) {
@@ -138,7 +140,7 @@ class DivePlanner {
             if (density > 6.2) this.warnings.push(`Bottom gas density too high: ${density.toFixed(1)} g/L`);
             const end = calculateEnd(this.depth, this.diluent.fHe);
             if (end > 30) this.warnings.push(`Bottom gas END too deep: ${end.toFixed(0)}m`);
-            const po2 = (this.depth / 10.0 + 1.0) * this.diluent.fO2;
+            const po2 = (this.surfacePressure + this.depth / 10.0) * this.diluent.fO2;
             if (po2 > 1.4) this.warnings.push(`Bottom gas pO2 too high: ${po2.toFixed(2)} bar`);
         }
     }
@@ -149,7 +151,7 @@ class DivePlanner {
         while (currentD < this.depth) {
             const nextD = Math.min(this.depth, currentD + 3.0);
             const segmentTime = (nextD - currentD) / this.descentRate;
-            const [fo2, fhe] = this.isCcr ? getCcrMix((currentD + nextD) / 2, this.diluent, this.setpoint) : [this.diluent.fO2, this.diluent.fHe];
+            const [fo2, fhe] = this.isCcr ? getCcrMix((currentD + nextD) / 2, this.diluent, this.setpoint, this.surfacePressure) : [this.diluent.fO2, this.diluent.fHe];
             this.engine.updateTissues(currentD, nextD, segmentTime, fo2, fhe);
             this.totalTime += segmentTime;
             currentD = nextD;
@@ -158,7 +160,7 @@ class DivePlanner {
     }
 
     private stayAtBottom() {
-        const [bfo2, bfhe] = this.isCcr ? getCcrMix(this.depth, this.diluent, this.setpoint) : [this.diluent.fO2, this.diluent.fHe];
+        const [bfo2, bfhe] = this.isCcr ? getCcrMix(this.depth, this.diluent, this.setpoint, this.surfacePressure) : [this.diluent.fO2, this.diluent.fHe];
         this.engine.updateTissues(this.depth, this.depth, this.bottomTime, bfo2, bfhe);
         this.totalTime += this.bottomTime;
         this.profile.push({ time: this.totalTime, depth: this.depth, gas: this.currentGasName });
@@ -185,7 +187,7 @@ class DivePlanner {
         
         if (this.isCcr && setpoint !== null) {
             const d = isTravel && nextDepth !== undefined ? (depth + nextDepth) / 2 : depth;
-            return getCcrMix(d, gas, setpoint);
+            return getCcrMix(d, gas, setpoint, this.surfacePressure);
         }
         return [gas.fO2, gas.fHe];
     }
