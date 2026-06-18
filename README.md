@@ -6,13 +6,13 @@
 [![React 19](https://img.shields.io/badge/frontend-React%2019%20%2B%20TS-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/build-Vite-646CFF.svg)](https://vitejs.dev/)
 
-**Deco Agent** is a high-precision technical diving gas management and decompression planning utility. Now refactored into a **unified TypeScript codebase**, it provides a single source of truth for decompression math across both CLI and Web platforms. It implements the industry-standard **Bühlmann ZHL-16C** decompression model with user-definable **Gradient Factors**.
+**Deco Agent** is a high-precision technical diving gas management and decompression planning utility. Now refactored into a **unified TypeScript codebase**, it provides a single source of truth for decompression math across both CLI and Web platforms. It implements the industry-standard **Bühlmann ZHL-16** decompression model (both the **B** and **C** coefficient sets, selectable at runtime) with user-definable **Gradient Factors**.
 
 ---
 
 ## 🚀 Key Features
 
--   **Unified ZHL-16C Engine**: Single TypeScript implementation for 16-compartment inert gas tracking (Nitrogen & Helium) using the **Schreiner Equation**.
+-   **Unified ZHL-16 Engine**: Single TypeScript implementation for 16-compartment inert gas tracking (Nitrogen & Helium) using the **Schreiner Equation**. Both the **ZHL-16B** and **ZHL-16C** coefficient sets are supported (select with `--model B|C` on the CLI or the model toggle in the web UI).
 -   **Gradient Factors (GF)**: Full control over conservatism (e.g., 50/80) to manage deep stops and surfacing safety.
 -   **Oxygen Toxicity Tracking**: Real-time calculation of **CNS%** (NOAA limits) and **OTUs** (pulmonary toxicity).
 -   **Gas Management & Physics**:
@@ -34,7 +34,7 @@
 -   **Language**: 100% TypeScript.
 -   **Runtime**: Node.js (CLI) & Browser (Web).
 -   **Frontend**: React 19, Vite, Recharts, Lucide React.
--   **Physiological Core**: Custom ZHL-16C implementation in `shared/engine/`.
+-   **Physiological Core**: Custom ZHL-16B/C implementation in `shared/engine/`.
 -   **Testing**: Vitest for unit and integration testing.
 
 ---
@@ -50,7 +50,7 @@
 
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/yourusername/Deco_agent.git
+    git clone https://github.com/<your-org-or-user>/Deco_agent.git
     cd Deco_agent
     ```
 
@@ -112,12 +112,11 @@ The test suite covers:
 ## 🏗 Project Structure
 
 -   `shared/engine/`: The physiological core and planning orchestrator.
-    -   `deco_engine.ts`: ZHL-16C math, CNS/OTU tracking, Schreiner logic.
+    -   `deco_engine.ts`: ZHL-16B/C math, CNS/OTU tracking, Schreiner logic.
     -   `planner.ts`: Stop-by-stop planning logic.
--   `shared/`: Shared configurations and types.
+-   `shared/`: Shared configuration and types.
     -   `types.ts`: TypeScript interfaces used by CLI and Frontend.
-    -   `gas_config.json`: Database of standard diving gases.
-    -   `cylinders.json`: Configuration for common cylinder sizes.
+    -   `config.ts`: `GASES` (standard diving gas database) and `CYLINDERS` (common cylinder sizes).
 -   `bin/deco-agent.ts`: Node.js CLI entry point.
 -   `frontend/src/`: React source code, utilizing the shared engine.
     -   `components/`: Reusable UI elements (Charts, Forms).

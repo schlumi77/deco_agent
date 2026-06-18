@@ -1,13 +1,11 @@
-# Python
-venv/
-__pycache__/
-*.py[cod]
-*$py.class
-*.log
-
 # Node
 node_modules/
 dist/
+*.log
+
+# Test coverage
+.coverage
+coverage/
 
 # OS
 .DS_Store
