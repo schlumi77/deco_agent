@@ -3,8 +3,9 @@ import './App.css';
 import DiveForm from './components/DiveForm';
 import TissueChart from './components/TissueChart';
 import DiveProfileChart from './components/DiveProfileChart';
+import InfoModal from './components/InfoModal';
 import type { DivePlanResponse, DivePlanRequest } from '@shared/types';
-import { Activity, AlertTriangle, Settings, ChevronUp } from 'lucide-react';
+import { Activity, AlertTriangle, Settings, ChevronUp, Info } from 'lucide-react';
 import { planDive, calculateGasConsumption } from '@shared/engine/planner';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [model, setModel] = useState('C');
   const [showMobileParams, setShowMobileParams] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   const handlePlanChange = useCallback(async (request: DivePlanRequest) => {
     setLoading(true);
@@ -67,13 +69,21 @@ function App() {
       <header className="app-header">
         <div className="logo">
           <Activity size={24} color="#00ffcc" />
-          <h1>DECO AGENT <span className="version">v3.0</span></h1>
+          <h1>DECO AGENT <span className="version">v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '3.0'}</span></h1>
         </div>
         <div className="header-controls">
           <div className="status desktop-only">
             {loading ? <span className="blink">CALCULATING...</span> : <span>ENGINE: ZHL-16{model}</span>}
           </div>
-          <button 
+          <button
+            className="info-btn"
+            onClick={() => setShowInfo(true)}
+            aria-label="About Deco Agent"
+            title="About / Features"
+          >
+            <Info size={20} />
+          </button>
+          <button
             className={`mobile-toggle-btn ${showMobileParams ? 'active' : ''}`}
             onClick={() => setShowMobileParams(!showMobileParams)}
           >
@@ -191,6 +201,8 @@ function App() {
           </div>
         </div>
       </main>
+
+      {showInfo && <InfoModal onClose={() => setShowInfo(false)} />}
     </div>
   );
 }
