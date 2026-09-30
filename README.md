@@ -147,7 +147,8 @@ or the workflow itself.
         -   `InfoModal.tsx`: The About panel (features, version, disclaimer).
 -   `frontend/vite.config.ts`: Vite setup. Mirrors the `@shared/*` alias from
     `tsconfig.app.json` so the dev server resolves it like the production build, and
-    injects `__APP_VERSION__` / `__BUILD_TIME__` from the root `package.json`.
+    injects two build-time constants consumed by the About panel: `__APP_VERSION__`
+    (read from the root `package.json`) and `__BUILD_TIME__` (the build timestamp).
 -   `.github/workflows/`: `ci.yml` (tests + builds) and `deploy.yml` (GitHub Pages).
 -   `.claude/launch.json`: Dev-server definition (`web` → `npm run web` on port 5173)
     used by Claude Code's preview tooling. Not required to run the project by hand.

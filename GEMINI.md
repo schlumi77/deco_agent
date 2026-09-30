@@ -70,7 +70,7 @@ single non-interactive pass — this is what CI executes.
 - `frontend/src/components/InfoModal.tsx`: About panel (feature summary, version, disclaimer).
 
 **Config & tooling:**
-- `frontend/vite.config.ts`: `@shared/*` alias for the dev server, plus the `__APP_VERSION__` / `__BUILD_TIME__` defines.
+- `frontend/vite.config.ts`: `@shared/*` alias for the dev server, plus the `__APP_VERSION__` (from the root `package.json`) and `__BUILD_TIME__` (build timestamp) defines that `InfoModal` renders.
 - `.github/workflows/ci.yml`: Engine tests and frontend build.
 - `.github/workflows/deploy.yml`: GitHub Pages deployment.
 - `.claude/launch.json`: Dev-server config for Claude Code's preview pane.
