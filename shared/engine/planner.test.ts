@@ -141,3 +141,53 @@ describe('Planner invariants', () => {
         expect(() => planDive(40, 20, 'Nonexistent Mix', DECO_GASES)).toThrow();
     });
 });
+
+describe('Per-segment toxicity accounting', () => {
+    // Regression: generateResult() used to read the toxicity tracker for the
+    // bottom row *after* the whole dive had been simulated, so that row showed
+    // the end-of-dive total while the deco rows below it showed live running
+    // values. The CNS/OTU columns therefore appeared to run backwards.
+
+    it('reports CNS and OTU per segment, never decreasing down the schedule', () => {
+        const res = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.8, false);
+        expect(res.schedule.length).toBeGreaterThan(1);
+
+        for (let i = 1; i < res.schedule.length; i++) {
+            const prev = res.schedule[i - 1];
+            const curr = res.schedule[i];
+            expect(curr.cns).toBeGreaterThanOrEqual(prev.cns);
+            expect(curr.otu).toBeGreaterThanOrEqual(prev.otu);
+        }
+    });
+
+    it('shows bottom-segment loading on the bottom row, not the whole-dive total', () => {
+        const res = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.8, false);
+        const bottom = res.schedule[0];
+
+        // The deco that follows adds meaningful O2 exposure, so the bottom row
+        // must be strictly below the dive totals rather than equal to them.
+        expect(bottom.cns).toBeLessThan(res.cns_percent);
+        expect(bottom.otu).toBeLessThan(res.otus);
+        expect(bottom.cns).toBeGreaterThan(0);
+        expect(bottom.otu).toBeGreaterThan(0);
+    });
+
+    it('keeps every schedule row within the reported dive totals', () => {
+        const res = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.8, false);
+
+        for (const entry of res.schedule) {
+            expect(entry.cns).toBeLessThanOrEqual(res.cns_percent);
+            expect(entry.otu).toBeLessThanOrEqual(res.otus);
+        }
+    });
+
+    it('holds for CCR schedules as well', () => {
+        const res = planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, true, 1.3);
+
+        for (let i = 1; i < res.schedule.length; i++) {
+            expect(res.schedule[i].cns).toBeGreaterThanOrEqual(res.schedule[i - 1].cns);
+            expect(res.schedule[i].otu).toBeGreaterThanOrEqual(res.schedule[i - 1].otu);
+        }
+        expect(res.schedule[0].cns).toBeLessThan(res.cns_percent);
+    });
+});
