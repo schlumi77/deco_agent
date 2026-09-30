@@ -25,6 +25,7 @@
 -   **Modern Web Dashboard**:
     -   **Offline-capable** React 19 application running the engine directly in the browser.
     -   Interactive **Tissue Saturation Charts** and **Dive Profile Charts** (using Recharts).
+    -   Built-in **About panel** (the ℹ button in the header) summarising the engine's capabilities, the reported app version, and the safety disclaimer.
 -   **Node.js CLI**: A powerful terminal-based agent for rapid planning and gas checks.
 
 ---
@@ -102,10 +103,30 @@ The project uses **Vitest** for comprehensive testing of the physiological engin
 npm run test
 ```
 
+`npm run test` starts Vitest in **watch mode**. For a single non-interactive run
+(what CI does), append `run`:
+
+```bash
+npm run test -- run
+```
+
 The test suite covers:
--   **ZHL-16C Math**: Validation of tissue loading and M-values.
+-   **ZHL-16B/C Math**: Validation of tissue loading and M-values.
 -   **Schreiner Equation**: Accuracy of gas uptake and elimination during depth changes.
 -   **Planner Logic**: Verification of decompression stop generation and gas consumption.
+-   **Oxygen Toxicity**: CNS/OTU accumulation, including per-segment reporting in the schedule.
+
+### Continuous Integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to `main`
+and on every pull request, in two independent jobs:
+
+-   **Engine tests & typecheck**: `npm ci` then `npm run test -- run`.
+-   **Frontend typecheck & build**: `npm ci` then `npm run build` in `frontend/`.
+
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) publishes the built
+frontend to GitHub Pages on pushes to `main` that touch `frontend/**`, `shared/**`,
+or the workflow itself.
 
 ---
 
@@ -114,12 +135,22 @@ The test suite covers:
 -   `shared/engine/`: The physiological core and planning orchestrator.
     -   `deco_engine.ts`: ZHL-16B/C math, CNS/OTU tracking, Schreiner logic.
     -   `planner.ts`: Stop-by-stop planning logic.
+    -   `deco_engine.test.ts` / `planner.test.ts`: Vitest suites for the engine and planner.
 -   `shared/`: Shared configuration and types.
     -   `types.ts`: TypeScript interfaces used by CLI and Frontend.
     -   `config.ts`: `GASES` (standard diving gas database) and `CYLINDERS` (common cylinder sizes).
 -   `bin/deco-agent.ts`: Node.js CLI entry point.
 -   `frontend/src/`: React source code, utilizing the shared engine.
-    -   `components/`: Reusable UI elements (Charts, Forms).
+    -   `components/`: Reusable UI elements.
+        -   `DiveForm.tsx`: Dive parameter input.
+        -   `DiveProfileChart.tsx` / `TissueChart.tsx`: Recharts visualisations.
+        -   `InfoModal.tsx`: The About panel (features, version, disclaimer).
+-   `frontend/vite.config.ts`: Vite setup. Mirrors the `@shared/*` alias from
+    `tsconfig.app.json` so the dev server resolves it like the production build, and
+    injects `__APP_VERSION__` / `__BUILD_TIME__` from the root `package.json`.
+-   `.github/workflows/`: `ci.yml` (tests + builds) and `deploy.yml` (GitHub Pages).
+-   `.claude/launch.json`: Dev-server definition (`web` → `npm run web` on port 5173)
+    used by Claude Code's preview tooling. Not required to run the project by hand.
 
 ---
 
