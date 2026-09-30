@@ -42,6 +42,11 @@ class DivePlanner {
     private totalTime = 0.0;
     private profile: ProfileEntry[] = [];
     private decoSchedule: [number, number, number, string, number, number][] = [];
+    // Toxicity loading at the moment the bottom segment ends. Captured live,
+    // because the tracker keeps accumulating through the ascent and would
+    // otherwise report whole-dive totals on the bottom row.
+    private bottomCns = 0.0;
+    private bottomOtu = 0.0;
     private warnings: string[] = [];
     private currentGasName: string;
     private diluent: Gas;
@@ -164,6 +169,8 @@ class DivePlanner {
         this.engine.updateTissues(this.depth, this.depth, this.bottomTime, bfo2, bfhe);
         this.totalTime += this.bottomTime;
         this.profile.push({ time: this.totalTime, depth: this.depth, gas: this.currentGasName });
+        this.bottomCns = this.engine.toxicity_tracker.cns_percent;
+        this.bottomOtu = this.engine.toxicity_tracker.otus;
     }
 
     private getBestGas(d: number): { gas: Gas; setpoint: number | null } {
@@ -272,8 +279,8 @@ class DivePlanner {
             time: this.bottomTime,
             run_time: Math.round(this.depth / this.descentRate + this.bottomTime),
             gas: this.getGasDisplay(this.depth, this.diluent, this.isCcr ? this.setpoint : null),
-            cns: this.engine.toxicity_tracker.cns_percent,
-            otu: this.engine.toxicity_tracker.otus
+            cns: this.bottomCns,
+            otu: this.bottomOtu
         });
 
         if (this.decoSchedule.length > 0) {
