@@ -61,7 +61,7 @@ describe('Canonical dive schedules (regression goldens)', () => {
         expect(res.schedule[0]).toMatchObject({ depth: 30, time: 20 });
         // Only the enforced 6 m floor stop, ~1 min
         expect(totalStopTime(res)).toBeLessThanOrEqual(2);
-        expect(res.surface_gf).toBeCloseTo(74.0, 0);
+        expect(res.surface_gf).toBeCloseTo(43.0, 0);
         expect(res.warnings).toHaveLength(0);
     });
 
@@ -69,16 +69,17 @@ describe('Canonical dive schedules (regression goldens)', () => {
         const res = planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false);
         const stops = res.schedule.slice(1).map(s => [s.depth, s.time]);
         expect(stops).toEqual([
+            [21, 1],
             [18, 1],
-            [15, 1],
+            [15, 2],
             [12, 2],
             [9, 4],
-            [6, 13],
+            [6, 12],
         ]);
-        expect(res.schedule[res.schedule.length - 1].run_time).toBe(52);
-        expect(res.surface_gf).toBeCloseTo(84.6, 0);
-        expect(res.cns_percent).toBeCloseTo(46.5, 0);
-        expect(res.otus).toBeCloseTo(74.1, 0);
+        expect(res.schedule[res.schedule.length - 1].run_time).toBe(53);
+        expect(res.surface_gf).toBeCloseTo(59.9, 0);
+        expect(res.cns_percent).toBeCloseTo(46.1, 0);
+        expect(res.otus).toBeCloseTo(75.5, 0);
         expect(res.warnings).toHaveLength(0);
     });
 
@@ -189,5 +190,41 @@ describe('Per-segment toxicity accounting', () => {
             expect(res.schedule[i].otu).toBeGreaterThanOrEqual(res.schedule[i - 1].otu);
         }
         expect(res.schedule[0].cns).toBeLessThan(res.cns_percent);
+    });
+});
+
+describe('Gradient factor handling', () => {
+    // Regression: the GF slope used to be anchored at the maximum depth, so
+    // the first stop was governed by a blend of GF Low and GF High instead of
+    // GF Low alone, and `surface_gf` reported tissue tension as a share of the
+    // M-value rather than a gradient factor.
+
+    it('lets GF Low alone decide the first stop', () => {
+        const gf80 = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.8, false);
+        const gf95 = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.95, false);
+        expect(gf80.schedule[1].depth).toBe(18);
+        expect(gf95.schedule[1].depth).toBe(gf80.schedule[1].depth);
+    });
+
+    it('starts stops deeper when GF Low is reduced', () => {
+        const gf50 = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.8, false);
+        const gf30 = planDive(50, 20, 'Air', DECO_GASES, 0.3, 0.8, false);
+        expect(gf30.schedule[1].depth).toBeGreaterThan(gf50.schedule[1].depth);
+    });
+
+    it('surfaces at or below GF High', () => {
+        const dives: [number, number, string, number, number, boolean, boolean][] = [
+            [40, 25, 'Air', 0.5, 0.8, false, true],
+            [60, 25, 'Tx 18/45', 0.3, 0.7, false, true],
+            [90, 30, 'Tx 12/65', 0.4, 0.7, false, true],
+            [50, 20, 'Tx 18/45', 0.5, 0.8, true, true],
+            [45, 30, 'Air', 0.5, 0.8, false, false],
+            [70, 20, 'Tx 15/55', 0.2, 0.85, false, true],
+        ];
+        for (const [depth, time, gas, gfLow, gfHigh, isCcr, force6m] of dives) {
+            const res = planDive(depth, time, gas, DECO_GASES, gfLow, gfHigh, isCcr, 1.3, null, null, 20, 10, force6m);
+            expect(res.surface_gf).toBeGreaterThan(0);
+            expect(res.surface_gf).toBeLessThanOrEqual(gfHigh * 100);
+        }
     });
 });

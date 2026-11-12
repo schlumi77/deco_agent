@@ -159,6 +159,27 @@ export class DecoEngine {
         return Math.max(0, ceiling);
     }
 
+    // Gradient factor the diver would surface with right now: for each
+    // compartment, how far the tissue tension sits between ambient surface
+    // pressure (0%) and the surfacing M-value (100%), taking the worst one.
+    // This is the quantity GF High limits, unlike load_percent in
+    // getTissueLoads(), which is tissue tension as a share of the M-value.
+    getSurfaceGf(): number {
+        let max_gf = 0.0;
+        for (let i = 0; i < 16; i++) {
+            const p_tissue = this.p_n2[i] + this.p_he[i];
+            if (p_tissue <= this.surface_pressure) continue;
+
+            const a = (this.compartments[i][1] * this.p_n2[i] + this.compartments[i][4] * this.p_he[i]) / p_tissue;
+            const b = (this.compartments[i][2] * this.p_n2[i] + this.compartments[i][5] * this.p_he[i]) / p_tissue;
+            const m_value_surf = a + this.surface_pressure / b;
+
+            const gf = (p_tissue - this.surface_pressure) / (m_value_surf - this.surface_pressure) * 100.0;
+            max_gf = Math.max(max_gf, gf);
+        }
+        return max_gf;
+    }
+
     getTissueLoads() {
         const loads = [];
         for (let i = 0; i < 16; i++) {
