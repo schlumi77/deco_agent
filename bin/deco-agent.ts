@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { Command } from 'commander';
+import { Command, InvalidArgumentError } from 'commander';
 import chalk from 'chalk';
 import { 
     planDive, 
@@ -9,6 +9,20 @@ import {
     calculateMinOd, 
     calculateEnd 
 } from '../shared/engine/planner.js';
+
+function parseNumber(value: string): number {
+    const n = Number(value);
+    if (value.trim() === '' || !Number.isFinite(n)) throw new InvalidArgumentError('Not a number.');
+    return n;
+}
+
+function parseChoice(choices: string[]) {
+    return (value: string): string => {
+        const v = value.toLowerCase();
+        if (!choices.includes(v)) throw new InvalidArgumentError(`Allowed: ${choices.join(', ')}.`);
+        return v;
+    };
+}
 
 const program = new Command();
 
@@ -39,21 +53,21 @@ program
 program
   .command('plan')
   .description('Calculate a dive plan')
-  .requiredOption('-d, --depth <number>', 'Maximum depth in meters', parseFloat)
-  .requiredOption('-t, --time <number>', 'Bottom time in minutes', parseFloat)
+  .requiredOption('-d, --depth <number>', 'Maximum depth in meters', parseNumber)
+  .requiredOption('-t, --time <number>', 'Bottom time in minutes', parseNumber)
   .option('-g, --gas <string>', 'Bottom gas/diluent name', 'Tx 6/90')
-  .option('-m, --mode <string>', 'Dive mode (ccr/oc)', 'ccr')
-  .option('--gf-low <number>', 'Gradient Factor Low %', '50')
-  .option('--gf-high <number>', 'Gradient Factor High %', '80')
-  .option('--setpoint <number>', 'CCR Bottom Setpoint', '1.2')
-  .option('--deco-setpoint <number>', 'CCR Deco Setpoint', '1.2')
-  .option('--deco-gas-setpoint <number>', 'CCR Deco Gas Switch Setpoint', '1.4')
-  .option('--desc-rate <number>', 'Descent Rate m/min', '20')
-  .option('--asc-rate <number>', 'Ascent Rate m/min', '10')
-  .option('--model <string>', 'Bühlmann Model (B/C)', 'C')
+  .option('-m, --mode <string>', 'Dive mode (ccr/oc)', parseChoice(['ccr', 'oc']), 'ccr')
+  .option('--gf-low <number>', 'Gradient Factor Low %', parseNumber, 50)
+  .option('--gf-high <number>', 'Gradient Factor High %', parseNumber, 80)
+  .option('--setpoint <number>', 'CCR Bottom Setpoint', parseNumber, 1.2)
+  .option('--deco-setpoint <number>', 'CCR Deco Setpoint', parseNumber, 1.2)
+  .option('--deco-gas-setpoint <number>', 'CCR Deco Gas Switch Setpoint', parseNumber, 1.4)
+  .option('--desc-rate <number>', 'Descent Rate m/min', parseNumber, 20)
+  .option('--asc-rate <number>', 'Ascent Rate m/min', parseNumber, 10)
+  .option('--model <string>', 'Bühlmann Model (B/C)', parseChoice(['b', 'c']), 'c')
   .option('--no-force-6m', 'Allow 3m stops')
   .action((options) => {
-    const isCcr = options.mode.toLowerCase() === 'ccr';
+    const isCcr = options.mode === 'ccr';
     const decoGases = ["Oxygen", "Tx 50/15", "Tx 35/35", "Tx 24/35", "Tx 17/70"];
     
     try {
