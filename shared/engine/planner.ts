@@ -37,6 +37,12 @@ export function getTravelTime(d1: number, d2: number, asc_rate: number): number 
     return (d1 - 10.0) / asc_rate + (10.0 - d2) / 1.0;
 }
 
+function requirePositive(value: number, label: string) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+        throw new Error(`${label} must be a number greater than 0 (got ${value})`);
+    }
+}
+
 class DivePlanner {
     private engine: DecoEngine;
     private totalTime = 0.0;
@@ -81,6 +87,26 @@ class DivePlanner {
         force6m: boolean,
         model: string
     ) {
+        // Reject bad input up front: a plan built on a typo is worse than no plan.
+        requirePositive(depth, 'Depth');
+        requirePositive(bottomTime, 'Bottom time');
+        requirePositive(descentRate, 'Descent rate');
+        requirePositive(ascentRate, 'Ascent rate');
+        requirePositive(gfLow, 'GF Low');
+        requirePositive(gfHigh, 'GF High');
+        if (gfHigh > 1) throw new Error(`GF High must not exceed 100% (got ${Math.round(gfHigh * 100)}%)`);
+        if (gfLow > gfHigh) {
+            throw new Error(`GF Low (${Math.round(gfLow * 100)}%) must not exceed GF High (${Math.round(gfHigh * 100)}%)`);
+        }
+        if (typeof model !== 'string' || !['B', 'C'].includes(model.toUpperCase())) {
+            throw new Error(`Unknown model "${model}": use B or C`);
+        }
+        if (isCcr) {
+            requirePositive(setpoint, 'Setpoint');
+            if (decoSetpoint !== null) requirePositive(decoSetpoint, 'Deco setpoint');
+            if (decoGasSetpoint !== null) requirePositive(decoGasSetpoint, 'Deco gas setpoint');
+        }
+
         this.depth = depth;
         this.bottomTime = bottomTime;
         this.gfLow = gfLow;
@@ -98,12 +124,15 @@ class DivePlanner {
 
         const gasesMap = new Map<string, Gas>(GASES.map(g => [g.name, g]));
         const dil = gasesMap.get(bottomGasName);
-        if (!dil) throw new Error(`Gas ${bottomGasName} not found`);
+        if (!dil) throw new Error(`Unknown bottom gas "${bottomGasName}"`);
         this.diluent = dil;
 
         this.decoCandidates = decoGasNames
-            .map(name => gasesMap.get(name))
-            .filter((g): g is Gas => !!g)
+            .map(name => {
+                const gas = gasesMap.get(name);
+                if (!gas) throw new Error(`Unknown deco gas "${name}"`);
+                return gas;
+            })
             .sort((a, b) => b.fO2 - a.fO2);
 
         this.currentGasName = this.getGasStable(this.diluent, isCcr ? setpoint : null);

@@ -228,3 +228,46 @@ describe('Gradient factor handling', () => {
         }
     });
 });
+
+describe('Input validation', () => {
+    // planDive(depth, bottomTime, bottomGas, decoGases, gfLow, gfHigh, isCcr,
+    //          setpoint, decoSetpoint, decoGasSetpoint, descentRate, ascentRate, force6m, model)
+
+    it('rejects a non-positive or non-numeric depth and bottom time', () => {
+        expect(() => planDive(-40, 20, 'Air', DECO_GASES)).toThrow(/Depth/);
+        expect(() => planDive(0, 20, 'Air', DECO_GASES)).toThrow(/Depth/);
+        expect(() => planDive(NaN, 20, 'Air', DECO_GASES)).toThrow(/Depth/);
+        expect(() => planDive('40' as unknown as number, 20, 'Air', DECO_GASES)).toThrow(/Depth/);
+        expect(() => planDive(40, 0, 'Air', DECO_GASES)).toThrow(/Bottom time/);
+    });
+
+    it('rejects gradient factors that are inverted or out of range', () => {
+        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.9, 0.3)).toThrow(/GF Low/);
+        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.5, 1.2)).toThrow(/GF High/);
+        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0, 0.8)).toThrow(/GF Low/);
+    });
+
+    it('accepts equal gradient factors', () => {
+        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.8, 0.8)).not.toThrow();
+    });
+
+    it('rejects non-positive descent and ascent rates', () => {
+        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.5, 0.8, false, 1.2, null, null, 0, 10)).toThrow(/Descent rate/);
+        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.5, 0.8, false, 1.2, null, null, 20, -5)).toThrow(/Ascent rate/);
+    });
+
+    it('rejects an unknown model instead of falling back to ZHL-16C', () => {
+        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.5, 0.8, false, 1.2, null, null, 20, 10, true, 'X')).toThrow(/model/);
+        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.5, 0.8, false, 1.2, null, null, 20, 10, true, 'b')).not.toThrow();
+    });
+
+    it('rejects an unknown deco gas instead of silently dropping it', () => {
+        expect(() => planDive(50, 20, 'Air', ['Oxigen'])).toThrow(/Unknown deco gas "Oxigen"/);
+    });
+
+    it('rejects a bad setpoint for CCR dives only', () => {
+        expect(() => planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, true, 0)).toThrow(/Setpoint/);
+        expect(() => planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, true, '1.3' as unknown as number)).toThrow(/Setpoint/);
+        expect(() => planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false, 0)).not.toThrow();
+    });
+});
