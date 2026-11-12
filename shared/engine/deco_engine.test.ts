@@ -143,3 +143,25 @@ describe('CCR loop mix (getCcrMix)', () => {
         expect(fhe).toBe(0.0);
     });
 });
+
+describe('Surfacing gradient factor (getSurfaceGf)', () => {
+    it('is zero for tissues in equilibrium with the surface', () => {
+        const e = new DecoEngine(SURFACE_PRESSURE, 'C');
+        expect(e.getSurfaceGf()).toBe(0);
+    });
+
+    it('exceeds 100% after a saturating exposure that would breach the M-value', () => {
+        const e = new DecoEngine(SURFACE_PRESSURE, 'C');
+        e.updateTissues(40, 40, 60, 0.21, 0.0);
+        expect(e.getSurfaceGf()).toBeGreaterThan(100);
+    });
+
+    it('measures the gradient above ambient, so it reads lower than the M-value share', () => {
+        const e = new DecoEngine(SURFACE_PRESSURE, 'C');
+        e.updateTissues(30, 30, 15, 0.21, 0.0);
+        const gf = e.getSurfaceGf();
+        const mValueShare = Math.max(...e.getTissueLoads().map(l => l.load_percent));
+        expect(gf).toBeGreaterThan(0);
+        expect(gf).toBeLessThan(mValueShare);
+    });
+});

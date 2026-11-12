@@ -203,6 +203,10 @@ class DivePlanner {
         let currentDepth = this.depth;
         let stuckCounter = 0;
         const floor = this.force6m ? 6.0 : 3.0;
+        // Depth of the first required stop. GF Low governs the ascent until
+        // that stop is found; from there the GF rises linearly to GF High at
+        // the surface.
+        let firstStopDepth: number | null = null;
 
         while (currentDepth > 0) {
             stuckCounter++;
@@ -211,7 +215,9 @@ class DivePlanner {
                 break;
             }
 
-            const gfAtDepth = this.gfHigh - (this.gfHigh - this.gfLow) * (currentDepth / this.depth);
+            const gfAtDepth = firstStopDepth === null
+                ? this.gfLow
+                : this.gfHigh - (this.gfHigh - this.gfLow) * (currentDepth / firstStopDepth);
             const ceiling = this.engine.getCeiling(gfAtDepth);
 
             let nextStop;
@@ -240,6 +246,7 @@ class DivePlanner {
                 this.profile.push({ time: this.totalTime, depth: this.getDisplayDepth(currentDepth), gas: this.currentGasName });
                 stuckCounter = 0;
             } else {
+                if (firstStopDepth === null) firstStopDepth = currentDepth;
                 const [fo2, fhe] = this.updateGas(currentDepth);
                 const { gas, setpoint } = this.getBestGas(currentDepth);
 
@@ -300,8 +307,8 @@ class DivePlanner {
         }
 
         const tissueLoads = this.engine.getTissueLoads();
-        const surfaceGf = Math.max(...tissueLoads.map(l => l.load_percent));
-        if (surfaceGf > 100) this.warnings.push(`Surfacing with tissue load > 100%: ${surfaceGf.toFixed(1)}%`);
+        const surfaceGf = this.engine.getSurfaceGf();
+        if (surfaceGf > 100) this.warnings.push(`Surfacing above the M-value: surface GF ${surfaceGf.toFixed(1)}%`);
 
         return {
             schedule: finalSchedule,
