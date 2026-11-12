@@ -4,22 +4,23 @@
   "description": "Unified TypeScript Technical Diving Planner",
   "type": "module",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "cli": "tsx bin/deco-agent.ts",
     "web": "cd frontend && npm run dev",
     "build:cli": "tsc bin/deco-agent.ts --outDir dist --module esnext --target esnext --moduleResolution node --resolveJsonModule --esModuleInterop --allowSyntheticDefaultImports",
+    "typecheck": "tsc --noEmit",
     "test": "vitest"
   },
   "dependencies": {
-    "commander": "^11.1.0",
     "chalk": "^5.3.0",
+    "commander": "^11.1.0",
     "tsx": "^4.7.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
     "typescript": "^5.3.3",
-    "vitest": "^1.3.1"
+    "vitest": "^4.1.12"
   }
 }

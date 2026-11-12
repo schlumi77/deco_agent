@@ -44,6 +44,7 @@ export interface DivePlanResponse {
     gas_requirements?: GasRequirements;
 }
 
+// A complete dive plan request. Gradient factors are percentages (e.g. 50 / 80).
 export interface DivePlanRequest {
     depth: number;
     bottom_time: number;
@@ -60,3 +61,9 @@ export interface DivePlanRequest {
     force_6m: boolean;
     model: string;
 }
+
+// What planDive() accepts: the dive itself is required, everything else falls
+// back to PLAN_DEFAULTS in config.ts. An omitted deco_setpoint follows setpoint.
+export type DivePlanInput =
+    Pick<DivePlanRequest, 'depth' | 'bottom_time' | 'bottom_gas'> &
+    Partial<Omit<DivePlanRequest, 'depth' | 'bottom_time' | 'bottom_gas'>>;
