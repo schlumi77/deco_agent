@@ -30,3 +30,18 @@ export const CYLINDERS: Cylinder[] = [
     {"name": "Inflation", "volume": 3.0, "pressure": 200, "gas": "Air", "role": "suit"},
     {"name": "Stage", "volume": 5.4, "pressure": 200, "gas": "Deco Tx", "role": "stage"}
 ];
+
+// Defaults shared by the engine, the CLI and the web form, so the same dive
+// gives the same plan wherever it is entered. Gradient factors are percentages.
+export const PLAN_DEFAULTS = {
+    deco_gases: [] as string[],
+    gf_low: 50,
+    gf_high: 80,
+    is_ccr: false,
+    setpoint: 1.2,
+    deco_gas_setpoint: 1.4,
+    descent_rate: 20,
+    ascent_rate: 10,
+    force_6m: true,
+    model: 'C',
+};

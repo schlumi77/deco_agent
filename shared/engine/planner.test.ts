@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planDive } from './planner.js';
+import { planDive, PLAN_DEFAULTS } from './planner.js';
 import type { DivePlanResponse } from '../types.js';
 
 const DECO_GASES = ['Oxygen', 'Tx 50/15'];
@@ -16,7 +16,7 @@ describe('CCR Gas Display', () => {
         // fO2 = 1.3 / 5.9373 = 0.2189... (approx 22%)
         // fHe = 0.45 * (1 - 0.22) / (1 - 0.18) = 0.45 * 0.78 / 0.82 = 0.428... (approx 43%)
         
-        const result = planDive(50, 20, "Tx 18/45", ["Tx 50/15", "Oxygen"], 0.5, 0.8, true, 1.3);
+        const result = planDive({ depth: 50, bottom_time: 20, bottom_gas: "Tx 18/45", deco_gases: ["Tx 50/15", "Oxygen"], is_ccr: true, setpoint: 1.3 });
         
         // Check bottom segment
         const bottomSegment = result.schedule[0];
@@ -33,7 +33,7 @@ describe('CCR Gas Display', () => {
         // So loop fO2 should be 1.0.
         // fHe should be 0.
         
-        const result = planDive(50, 20, "Tx 18/45", ["Tx 50/15", "Oxygen"], 0.5, 0.8, true, 1.3);
+        const result = planDive({ depth: 50, bottom_time: 20, bottom_gas: "Tx 18/45", deco_gases: ["Tx 50/15", "Oxygen"], is_ccr: true, setpoint: 1.3 });
         
         const oxygenStop = result.schedule.find(s => s.depth === 6);
         if (oxygenStop) {
@@ -43,7 +43,7 @@ describe('CCR Gas Display', () => {
     });
 
     it('should NOT include brackets for OC dives', () => {
-        const result = planDive(50, 20, "Tx 18/45", ["Tx 50/15", "Oxygen"], 0.5, 0.8, false);
+        const result = planDive({ depth: 50, bottom_time: 20, bottom_gas: "Tx 18/45", deco_gases: ["Tx 50/15", "Oxygen"] });
         
         const bottomSegment = result.schedule[0];
         expect(bottomSegment.gas).toBe("Tx 18/45");
@@ -57,7 +57,7 @@ describe('Canonical dive schedules (regression goldens)', () => {
     // goldens together with a note in the PR explaining the expected change.
 
     it('30 m / 20 min on air is effectively a no-stop dive', () => {
-        const res = planDive(30, 20, 'Air', DECO_GASES, 0.5, 0.8, false);
+        const res = planDive({ depth: 30, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES });
         expect(res.schedule[0]).toMatchObject({ depth: 30, time: 20 });
         // Only the enforced 6 m floor stop, ~1 min
         expect(totalStopTime(res)).toBeLessThanOrEqual(2);
@@ -66,7 +66,7 @@ describe('Canonical dive schedules (regression goldens)', () => {
     });
 
     it('50 m / 20 min on Tx 18/45 produces the expected stops', () => {
-        const res = planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false);
+        const res = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES });
         const stops = res.schedule.slice(1).map(s => [s.depth, s.time]);
         expect(stops).toEqual([
             [21, 1],
@@ -84,24 +84,24 @@ describe('Canonical dive schedules (regression goldens)', () => {
     });
 
     it('ZHL-16B and ZHL-16C diverge for the same dive', () => {
-        const c = planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false, 1.2, null, null, 20, 10, true, 'C');
-        const b = planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false, 1.2, null, null, 20, 10, true, 'B');
+        const c = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES });
+        const b = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES, model: 'B' });
         expect(b.schedule).not.toEqual(c.schedule);
     });
 });
 
 describe('Planner invariants', () => {
-    const base = () => planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false);
+    const base = () => planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES });
 
     it('more bottom time never reduces total decompression', () => {
-        const short = planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false);
-        const long = planDive(50, 30, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false);
+        const short = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES });
+        const long = planDive({ depth: 50, bottom_time: 30, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES });
         expect(totalStopTime(long)).toBeGreaterThan(totalStopTime(short));
     });
 
     it('more depth never reduces total decompression', () => {
-        const shallow = planDive(40, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false);
-        const deep = planDive(60, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false);
+        const shallow = planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES });
+        const deep = planDive({ depth: 60, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES });
         expect(totalStopTime(deep)).toBeGreaterThan(totalStopTime(shallow));
     });
 
@@ -112,7 +112,7 @@ describe('Planner invariants', () => {
     });
 
     it('permits 3 m stops when the 6 m floor is disabled', () => {
-        const res = planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false, 1.2, null, null, 20, 10, false);
+        const res = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES, force_6m: false });
         expect(res.schedule.some(s => s.depth === 3)).toBe(true);
     });
 
@@ -134,12 +134,12 @@ describe('Planner invariants', () => {
     });
 
     it('does not get stuck in the ascent loop for a deep, long dive', () => {
-        const res = planDive(90, 30, 'Tx 12/65', DECO_GASES, 0.4, 0.7, false);
+        const res = planDive({ depth: 90, bottom_time: 30, bottom_gas: 'Tx 12/65', deco_gases: DECO_GASES, gf_low: 40, gf_high: 70 });
         expect(res.warnings).not.toContain('Deco stuck: Infinite loop detected');
     });
 
     it('throws on an unknown bottom gas', () => {
-        expect(() => planDive(40, 20, 'Nonexistent Mix', DECO_GASES)).toThrow();
+        expect(() => planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Nonexistent Mix', deco_gases: DECO_GASES })).toThrow();
     });
 });
 
@@ -150,7 +150,7 @@ describe('Per-segment toxicity accounting', () => {
     // values. The CNS/OTU columns therefore appeared to run backwards.
 
     it('reports CNS and OTU per segment, never decreasing down the schedule', () => {
-        const res = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.8, false);
+        const res = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES });
         expect(res.schedule.length).toBeGreaterThan(1);
 
         for (let i = 1; i < res.schedule.length; i++) {
@@ -162,7 +162,7 @@ describe('Per-segment toxicity accounting', () => {
     });
 
     it('shows bottom-segment loading on the bottom row, not the whole-dive total', () => {
-        const res = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.8, false);
+        const res = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES });
         const bottom = res.schedule[0];
 
         // The deco that follows adds meaningful O2 exposure, so the bottom row
@@ -174,7 +174,7 @@ describe('Per-segment toxicity accounting', () => {
     });
 
     it('keeps every schedule row within the reported dive totals', () => {
-        const res = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.8, false);
+        const res = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES });
 
         for (const entry of res.schedule) {
             expect(entry.cns).toBeLessThanOrEqual(res.cns_percent);
@@ -183,7 +183,7 @@ describe('Per-segment toxicity accounting', () => {
     });
 
     it('holds for CCR schedules as well', () => {
-        const res = planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, true, 1.3);
+        const res = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES, is_ccr: true, setpoint: 1.3 });
 
         for (let i = 1; i < res.schedule.length; i++) {
             expect(res.schedule[i].cns).toBeGreaterThanOrEqual(res.schedule[i - 1].cns);
@@ -200,74 +200,97 @@ describe('Gradient factor handling', () => {
     // M-value rather than a gradient factor.
 
     it('lets GF Low alone decide the first stop', () => {
-        const gf80 = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.8, false);
-        const gf95 = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.95, false);
+        const gf80 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES });
+        const gf95 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, gf_high: 95 });
         expect(gf80.schedule[1].depth).toBe(18);
         expect(gf95.schedule[1].depth).toBe(gf80.schedule[1].depth);
     });
 
     it('starts stops deeper when GF Low is reduced', () => {
-        const gf50 = planDive(50, 20, 'Air', DECO_GASES, 0.5, 0.8, false);
-        const gf30 = planDive(50, 20, 'Air', DECO_GASES, 0.3, 0.8, false);
+        const gf50 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES });
+        const gf30 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, gf_low: 30 });
         expect(gf30.schedule[1].depth).toBeGreaterThan(gf50.schedule[1].depth);
     });
 
     it('surfaces at or below GF High', () => {
         const dives: [number, number, string, number, number, boolean, boolean][] = [
-            [40, 25, 'Air', 0.5, 0.8, false, true],
-            [60, 25, 'Tx 18/45', 0.3, 0.7, false, true],
-            [90, 30, 'Tx 12/65', 0.4, 0.7, false, true],
-            [50, 20, 'Tx 18/45', 0.5, 0.8, true, true],
-            [45, 30, 'Air', 0.5, 0.8, false, false],
-            [70, 20, 'Tx 15/55', 0.2, 0.85, false, true],
+            [40, 25, 'Air', 50, 80, false, true],
+            [60, 25, 'Tx 18/45', 30, 70, false, true],
+            [90, 30, 'Tx 12/65', 40, 70, false, true],
+            [50, 20, 'Tx 18/45', 50, 80, true, true],
+            [45, 30, 'Air', 50, 80, false, false],
+            [70, 20, 'Tx 15/55', 20, 85, false, true],
         ];
         for (const [depth, time, gas, gfLow, gfHigh, isCcr, force6m] of dives) {
-            const res = planDive(depth, time, gas, DECO_GASES, gfLow, gfHigh, isCcr, 1.3, null, null, 20, 10, force6m);
+            const res = planDive({ depth, bottom_time: time, bottom_gas: gas, deco_gases: DECO_GASES, gf_low: gfLow, gf_high: gfHigh, is_ccr: isCcr, setpoint: 1.3, force_6m: force6m });
             expect(res.surface_gf).toBeGreaterThan(0);
-            expect(res.surface_gf).toBeLessThanOrEqual(gfHigh * 100);
+            expect(res.surface_gf).toBeLessThanOrEqual(gfHigh);
         }
     });
 });
 
 describe('Input validation', () => {
-    // planDive(depth, bottomTime, bottomGas, decoGases, gfLow, gfHigh, isCcr,
-    //          setpoint, decoSetpoint, decoGasSetpoint, descentRate, ascentRate, force6m, model)
-
     it('rejects a non-positive or non-numeric depth and bottom time', () => {
-        expect(() => planDive(-40, 20, 'Air', DECO_GASES)).toThrow(/Depth/);
-        expect(() => planDive(0, 20, 'Air', DECO_GASES)).toThrow(/Depth/);
-        expect(() => planDive(NaN, 20, 'Air', DECO_GASES)).toThrow(/Depth/);
-        expect(() => planDive('40' as unknown as number, 20, 'Air', DECO_GASES)).toThrow(/Depth/);
-        expect(() => planDive(40, 0, 'Air', DECO_GASES)).toThrow(/Bottom time/);
+        expect(() => planDive({ depth: -40, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES })).toThrow(/Depth/);
+        expect(() => planDive({ depth: 0, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES })).toThrow(/Depth/);
+        expect(() => planDive({ depth: NaN, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES })).toThrow(/Depth/);
+        expect(() => planDive({ depth: '40' as unknown as number, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES })).toThrow(/Depth/);
+        expect(() => planDive({ depth: 40, bottom_time: 0, bottom_gas: 'Air', deco_gases: DECO_GASES })).toThrow(/Bottom time/);
     });
 
     it('rejects gradient factors that are inverted or out of range', () => {
-        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.9, 0.3)).toThrow(/GF Low/);
-        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.5, 1.2)).toThrow(/GF High/);
-        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0, 0.8)).toThrow(/GF Low/);
+        expect(() => planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, gf_low: 90, gf_high: 30 })).toThrow(/GF Low/);
+        expect(() => planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, gf_high: 120 })).toThrow(/GF High/);
+        expect(() => planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, gf_low: 0 })).toThrow(/GF Low/);
     });
 
     it('accepts equal gradient factors', () => {
-        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.8, 0.8)).not.toThrow();
+        expect(() => planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, gf_low: 80 })).not.toThrow();
     });
 
     it('rejects non-positive descent and ascent rates', () => {
-        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.5, 0.8, false, 1.2, null, null, 0, 10)).toThrow(/Descent rate/);
-        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.5, 0.8, false, 1.2, null, null, 20, -5)).toThrow(/Ascent rate/);
+        expect(() => planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, descent_rate: 0 })).toThrow(/Descent rate/);
+        expect(() => planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, ascent_rate: -5 })).toThrow(/Ascent rate/);
     });
 
     it('rejects an unknown model instead of falling back to ZHL-16C', () => {
-        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.5, 0.8, false, 1.2, null, null, 20, 10, true, 'X')).toThrow(/model/);
-        expect(() => planDive(40, 20, 'Air', DECO_GASES, 0.5, 0.8, false, 1.2, null, null, 20, 10, true, 'b')).not.toThrow();
+        expect(() => planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, model: 'X' })).toThrow(/model/);
+        expect(() => planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, model: 'b' })).not.toThrow();
     });
 
     it('rejects an unknown deco gas instead of silently dropping it', () => {
-        expect(() => planDive(50, 20, 'Air', ['Oxigen'])).toThrow(/Unknown deco gas "Oxigen"/);
+        expect(() => planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: ['Oxigen'] })).toThrow(/Unknown deco gas "Oxigen"/);
     });
 
     it('rejects a bad setpoint for CCR dives only', () => {
-        expect(() => planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, true, 0)).toThrow(/Setpoint/);
-        expect(() => planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, true, '1.3' as unknown as number)).toThrow(/Setpoint/);
-        expect(() => planDive(50, 20, 'Tx 18/45', DECO_GASES, 0.5, 0.8, false, 0)).not.toThrow();
+        expect(() => planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES, is_ccr: true, setpoint: 0 })).toThrow(/Setpoint/);
+        expect(() => planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES, is_ccr: true, setpoint: '1.3' as unknown as number })).toThrow(/Setpoint/);
+        expect(() => planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES, setpoint: 0 })).not.toThrow();
+    });
+});
+
+describe('Request defaults', () => {
+    it('needs only the dive itself and fills the rest from PLAN_DEFAULTS', () => {
+        const minimal = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES });
+        const explicit = planDive({
+            depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45',
+            ...PLAN_DEFAULTS, deco_gases: DECO_GASES,
+        });
+        expect(minimal).toEqual(explicit);
+        expect(PLAN_DEFAULTS).toMatchObject({ gf_low: 50, gf_high: 80, model: 'C', force_6m: true });
+    });
+
+    it('plans without deco gases when none are given', () => {
+        const res = planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air' });
+        expect(res.schedule.every(s => s.gas === 'Air')).toBe(true);
+    });
+
+    it('lets the deco setpoint follow the bottom setpoint unless given', () => {
+        const dive = { depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', is_ccr: true, setpoint: 1.3 };
+        const followed = planDive(dive);
+        const same = planDive({ ...dive, deco_setpoint: 1.3 });
+        const lower = planDive({ ...dive, deco_setpoint: 1.0 });
+        expect(followed).toEqual(same);
+        expect(lower.schedule).not.toEqual(followed.schedule);
     });
 });

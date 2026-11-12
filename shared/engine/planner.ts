@@ -1,8 +1,8 @@
 import { DecoEngine, calculateGasDensity, SURFACE_PRESSURE, WATER_VAPOR_PRESSURE } from './deco_engine.js';
-import type { ScheduleEntry, Gas, ProfileEntry, DivePlanResponse } from '../types.js';
-export type { Gas };
-import { GASES } from '../config.js';
-export { GASES };
+import type { ScheduleEntry, Gas, ProfileEntry, DivePlanResponse, DivePlanRequest, DivePlanInput } from '../types.js';
+export type { Gas, DivePlanInput };
+import { GASES, PLAN_DEFAULTS } from '../config.js';
+export { GASES, PLAN_DEFAULTS };
 
 export function calculateMod(fo2: number, maxPo2: number, surfacePressure = SURFACE_PRESSURE): number {
     if (fo2 <= 0) return Infinity;
@@ -71,41 +71,44 @@ class DivePlanner {
     private ascentRate: number;
     private force6m: boolean;
 
-    constructor(
-        depth: number,
-        bottomTime: number,
-        bottomGasName: string,
-        decoGasNames: string[],
-        gfLow: number,
-        gfHigh: number,
-        isCcr: boolean,
-        setpoint: number,
-        decoSetpoint: number | null,
-        decoGasSetpoint: number | null,
-        descentRate: number,
-        ascentRate: number,
-        force6m: boolean,
-        model: string
-    ) {
+    constructor(request: DivePlanRequest) {
+        const depth = request.depth;
+        const bottomTime = request.bottom_time;
+        const bottomGasName = request.bottom_gas;
+        const decoGasNames = request.deco_gases;
+        const isCcr = request.is_ccr;
+        const setpoint = request.setpoint;
+        const decoSetpoint = request.deco_setpoint;
+        const decoGasSetpoint = request.deco_gas_setpoint;
+        const descentRate = request.descent_rate;
+        const ascentRate = request.ascent_rate;
+        const force6m = request.force_6m;
+        const model = request.model;
+
         // Reject bad input up front: a plan built on a typo is worse than no plan.
         requirePositive(depth, 'Depth');
         requirePositive(bottomTime, 'Bottom time');
         requirePositive(descentRate, 'Descent rate');
         requirePositive(ascentRate, 'Ascent rate');
-        requirePositive(gfLow, 'GF Low');
-        requirePositive(gfHigh, 'GF High');
-        if (gfHigh > 1) throw new Error(`GF High must not exceed 100% (got ${Math.round(gfHigh * 100)}%)`);
-        if (gfLow > gfHigh) {
-            throw new Error(`GF Low (${Math.round(gfLow * 100)}%) must not exceed GF High (${Math.round(gfHigh * 100)}%)`);
+        requirePositive(request.gf_low, 'GF Low');
+        requirePositive(request.gf_high, 'GF High');
+        if (request.gf_high > 100) throw new Error(`GF High must not exceed 100% (got ${request.gf_high}%)`);
+        if (request.gf_low > request.gf_high) {
+            throw new Error(`GF Low (${request.gf_low}%) must not exceed GF High (${request.gf_high}%)`);
         }
         if (typeof model !== 'string' || !['B', 'C'].includes(model.toUpperCase())) {
             throw new Error(`Unknown model "${model}": use B or C`);
         }
+        if (!Array.isArray(decoGasNames)) throw new Error('Deco gases must be a list of gas names');
         if (isCcr) {
             requirePositive(setpoint, 'Setpoint');
-            if (decoSetpoint !== null) requirePositive(decoSetpoint, 'Deco setpoint');
-            if (decoGasSetpoint !== null) requirePositive(decoGasSetpoint, 'Deco gas setpoint');
+            requirePositive(decoSetpoint, 'Deco setpoint');
+            requirePositive(decoGasSetpoint, 'Deco gas setpoint');
         }
+
+        // The request carries gradient factors as percentages; the model uses fractions.
+        const gfLow = request.gf_low / 100;
+        const gfHigh = request.gf_high / 100;
 
         this.depth = depth;
         this.bottomTime = bottomTime;
@@ -117,8 +120,8 @@ class DivePlanner {
         this.ascentRate = ascentRate;
         this.force6m = force6m;
 
-        this.effectiveDecoSetpoint = decoSetpoint ?? setpoint;
-        this.effectiveDecoGasSetpoint = decoGasSetpoint ?? 1.4;
+        this.effectiveDecoSetpoint = decoSetpoint;
+        this.effectiveDecoGasSetpoint = decoGasSetpoint;
         this.engine = new DecoEngine(SURFACE_PRESSURE, model);
         this.surfacePressure = this.engine.surface_pressure;
 
@@ -359,28 +362,17 @@ class DivePlanner {
     }
 }
 
-export function planDive(
-    depth: number,
-    bottomTime: number,
-    bottomGasName: string,
-    decoGasNames: string[],
-    gfLow = 0.50,
-    gfHigh = 0.80,
-    isCcr = false,
-    setpoint = 1.2,
-    decoSetpoint: number | null = null,
-    decoGasSetpoint: number | null = null,
-    descentRate = 20.0,
-    ascentRate = 10.0,
-    force6m = true,
-    model = "C"
-): DivePlanResponse {
-    const planner = new DivePlanner(
-        depth, bottomTime, bottomGasName, decoGasNames,
-        gfLow, gfHigh, isCcr, setpoint, decoSetpoint, decoGasSetpoint,
-        descentRate, ascentRate, force6m, model
-    );
-    return planner.plan();
+// Plans a dive. Only depth, bottom_time and bottom_gas are required; every
+// other field falls back to PLAN_DEFAULTS. Gradient factors are percentages.
+export function planDive(input: DivePlanInput): DivePlanResponse {
+    const setpoint = input.setpoint ?? PLAN_DEFAULTS.setpoint;
+    const request: DivePlanRequest = {
+        ...PLAN_DEFAULTS,
+        ...input,
+        setpoint,
+        deco_setpoint: input.deco_setpoint ?? setpoint,
+    };
+    return new DivePlanner(request).plan();
 }
 
 export function calculateGasConsumption(

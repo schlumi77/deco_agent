@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { DivePlanRequest } from '@shared/types';
-import { GASES, type Gas } from '@shared/engine/planner';
+import { GASES, PLAN_DEFAULTS, type Gas } from '@shared/engine/planner';
 
 interface Props {
   onPlanChange: (request: DivePlanRequest) => void;
@@ -18,17 +18,8 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
       depth: 45,
       bottom_time: 20,
       bottom_gas: bestBottom,
-      deco_gases: [],
-      gf_low: 50,
-      gf_high: 80,
-      is_ccr: false,
-      setpoint: 1.2,
-      deco_setpoint: 1.2,
-      deco_gas_setpoint: 1.4,
-      descent_rate: 20,
-      ascent_rate: 10,
-      force_6m: true,
-      model: 'B',
+      ...PLAN_DEFAULTS,
+      deco_setpoint: PLAN_DEFAULTS.setpoint,
     };
   });
 

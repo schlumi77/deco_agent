@@ -1,10 +1,12 @@
 #!/usr/bin/env tsx
 import { Command, InvalidArgumentError } from 'commander';
 import chalk from 'chalk';
+import { readFileSync } from 'node:fs';
 import { 
     planDive, 
     calculateGasConsumption, 
     GASES, 
+    PLAN_DEFAULTS,
     calculateMod, 
     calculateMinOd, 
     calculateEnd 
@@ -24,12 +26,26 @@ function parseChoice(choices: string[]) {
     };
 }
 
+// The version lives in the root package.json. Walk up to find it so this works
+// both from source (bin/) and from the compiled output (dist/bin/).
+function readVersion(): string {
+    for (const rel of ['../package.json', '../../package.json']) {
+        try {
+            const pkg = JSON.parse(readFileSync(new URL(rel, import.meta.url), 'utf-8'));
+            if (pkg.name === 'deco-agent') return pkg.version;
+        } catch {
+            // try the next location
+        }
+    }
+    return 'unknown';
+}
+
 const program = new Command();
 
 program
   .name('deco-agent')
   .description('Technical Diving Gas Management and Decompression Planning Utility (ZHL-16B/C)')
-  .version('3.0.0');
+  .version(readVersion());
 
 program
   .command('gases')
@@ -57,36 +73,36 @@ program
   .requiredOption('-t, --time <number>', 'Bottom time in minutes', parseNumber)
   .option('-g, --gas <string>', 'Bottom gas/diluent name', 'Tx 6/90')
   .option('-m, --mode <string>', 'Dive mode (ccr/oc)', parseChoice(['ccr', 'oc']), 'ccr')
-  .option('--gf-low <number>', 'Gradient Factor Low %', parseNumber, 50)
-  .option('--gf-high <number>', 'Gradient Factor High %', parseNumber, 80)
-  .option('--setpoint <number>', 'CCR Bottom Setpoint', parseNumber, 1.2)
-  .option('--deco-setpoint <number>', 'CCR Deco Setpoint', parseNumber, 1.2)
-  .option('--deco-gas-setpoint <number>', 'CCR Deco Gas Switch Setpoint', parseNumber, 1.4)
-  .option('--desc-rate <number>', 'Descent Rate m/min', parseNumber, 20)
-  .option('--asc-rate <number>', 'Ascent Rate m/min', parseNumber, 10)
-  .option('--model <string>', 'Bühlmann Model (B/C)', parseChoice(['b', 'c']), 'c')
+  .option('--gf-low <number>', 'Gradient Factor Low %', parseNumber, PLAN_DEFAULTS.gf_low)
+  .option('--gf-high <number>', 'Gradient Factor High %', parseNumber, PLAN_DEFAULTS.gf_high)
+  .option('--setpoint <number>', 'CCR Bottom Setpoint', parseNumber, PLAN_DEFAULTS.setpoint)
+  .option('--deco-setpoint <number>', 'CCR Deco Setpoint (default: same as --setpoint)', parseNumber)
+  .option('--deco-gas-setpoint <number>', 'CCR Deco Gas Switch Setpoint', parseNumber, PLAN_DEFAULTS.deco_gas_setpoint)
+  .option('--desc-rate <number>', 'Descent Rate m/min', parseNumber, PLAN_DEFAULTS.descent_rate)
+  .option('--asc-rate <number>', 'Ascent Rate m/min', parseNumber, PLAN_DEFAULTS.ascent_rate)
+  .option('--model <string>', 'Bühlmann Model (B/C)', parseChoice(['b', 'c']), PLAN_DEFAULTS.model.toLowerCase())
   .option('--no-force-6m', 'Allow 3m stops')
   .action((options) => {
     const isCcr = options.mode === 'ccr';
     const decoGases = ["Oxygen", "Tx 50/15", "Tx 35/35", "Tx 24/35", "Tx 17/70"];
     
     try {
-        const result = planDive(
-            options.depth,
-            options.time,
-            options.gas,
-            decoGases,
-            options.gfLow / 100,
-            options.gfHigh / 100,
-            isCcr,
-            options.setpoint,
-            options.decoSetpoint,
-            options.decoGasSetpoint,
-            options.descRate,
-            options.ascRate,
-            options.force6m !== false,
-            options.model
-        );
+        const result = planDive({
+            depth: options.depth,
+            bottom_time: options.time,
+            bottom_gas: options.gas,
+            deco_gases: decoGases,
+            gf_low: options.gfLow,
+            gf_high: options.gfHigh,
+            is_ccr: isCcr,
+            setpoint: options.setpoint,
+            deco_setpoint: options.decoSetpoint,
+            deco_gas_setpoint: options.decoGasSetpoint,
+            descent_rate: options.descRate,
+            ascent_rate: options.ascRate,
+            force_6m: options.force6m !== false,
+            model: options.model,
+        });
 
         const gasReqs = calculateGasConsumption(
             result.schedule,

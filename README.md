@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js->=18.0.0-green.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js->=20.0.0-green.svg)](https://nodejs.org/)
 [![React 19](https://img.shields.io/badge/frontend-React%2019%20%2B%20TS-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/build-Vite-646CFF.svg)](https://vitejs.dev/)
 
@@ -44,7 +44,7 @@
 
 ### Prerequisites
 
--   **Node.js**: version 18.0.0 or higher.
+-   **Node.js**: version 20.0.0 or higher.
 -   **npm**: version 9.0.0 or higher.
 
 ### Installation
@@ -121,8 +121,8 @@ The test suite covers:
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to `main`
 and on every pull request, in two independent jobs:
 
--   **Engine tests & typecheck**: `npm ci` then `npm run test -- run`.
--   **Frontend typecheck & build**: `npm ci` then `npm run build` in `frontend/`.
+-   **Engine tests & typecheck**: `npm ci`, then `npm run typecheck` and `npm run test -- run`.
+-   **Frontend lint, typecheck & build**: `npm ci`, then `npm run lint` and `npm run build` in `frontend/`.
 
 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) publishes the built
 frontend to GitHub Pages on pushes to `main` that touch `frontend/**`, `shared/**`,
@@ -138,7 +138,8 @@ or the workflow itself.
     -   `deco_engine.test.ts` / `planner.test.ts`: Vitest suites for the engine and planner.
 -   `shared/`: Shared configuration and types.
     -   `types.ts`: TypeScript interfaces used by CLI and Frontend.
-    -   `config.ts`: `GASES` (standard diving gas database) and `CYLINDERS` (common cylinder sizes).
+    -   `config.ts`: `GASES` (standard diving gas database), `CYLINDERS` (common cylinder sizes) and
+        `PLAN_DEFAULTS` (the defaults shared by the engine, CLI and web form).
 -   `bin/deco-agent.ts`: Node.js CLI entry point.
 -   `frontend/src/`: React source code, utilizing the shared engine.
     -   `components/`: Reusable UI elements.
@@ -149,7 +150,8 @@ or the workflow itself.
     `tsconfig.app.json` so the dev server resolves it like the production build, and
     injects two build-time constants consumed by the About panel: `__APP_VERSION__`
     (read from the root `package.json`) and `__BUILD_TIME__` (the build timestamp).
--   `.github/workflows/`: `ci.yml` (tests + builds) and `deploy.yml` (GitHub Pages).
+-   `tsconfig.json`: Typecheck settings for `bin/` and `shared/` (`npm run typecheck`).
+-   `.github/workflows/`: `ci.yml` (typecheck, tests, lint and builds) and `deploy.yml` (GitHub Pages).
 -   `.claude/launch.json`: Dev-server definition (`web` → `npm run web` on port 5173)
     used by Claude Code's preview tooling. Not required to run the project by hand.
 -   `CLAUDE.md`: Instructions for AI coding agents (architecture, conventions, key files).

@@ -23,11 +23,14 @@ jobs:
       - name: Install root dependencies 🔧
         run: npm ci
 
+      - name: Typecheck engine and CLI 🔎
+        run: npm run typecheck
+
       - name: Run engine tests 🧪
         run: npm run test -- run
 
   frontend-build:
-    name: Frontend typecheck & build
+    name: Frontend lint, typecheck & build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout 🛎️
@@ -44,4 +47,5 @@ jobs:
         run: |
           cd frontend
           npm ci
+          npm run lint
           npm run build

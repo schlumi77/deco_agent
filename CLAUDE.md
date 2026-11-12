@@ -46,15 +46,24 @@ npm run test -- run
 `npm run test` alone starts Vitest in watch mode. Always append `run` for a
 single non-interactive pass — this is what CI executes.
 
+### Typecheck and Lint
+```bash
+npm run typecheck              # bin/ and shared/, strict
+cd frontend && npm run lint    # ESLint for the web app
+```
+
+Requires Node.js 20 or higher.
+
 ## Development Conventions
 
 1.  **Shared Logic**: Never duplicate decompression math. All changes to ZHL-16B/C or the Schreiner equation MUST happen in `shared/engine/`.
-2.  **Type Safety**: Use types from `shared/types.ts` for consistency across CLI and Web.
+2.  **Type Safety**: Use types from `shared/types.ts` for consistency across CLI and Web. `planDive()` takes one request object (`DivePlanInput`), with gradient factors as percentages (50 / 80); only `depth`, `bottom_time` and `bottom_gas` are required.
 3.  **Accuracy**: All pressure-to-depth conversions assume meters of salt water (MSW) using the `(Pressure - SurfacePressure) * 10` formula.
 4.  **Offline-First**: The web app is designed to run the engine entirely in the browser. Do not introduce server-side dependencies for core planning.
-5.  **Keep CI Green**: Any engine change must pass `npm run test -- run`, and any frontend change must pass `npm run build` in `frontend/`. CI runs both on every PR.
-6.  **Single Version Source**: The app version comes from the root `package.json` via the `__APP_VERSION__` define in `frontend/vite.config.ts`. Do not hardcode version strings in components.
+5.  **Keep CI Green**: Any engine or CLI change must pass `npm run typecheck` and `npm run test -- run`, and any frontend change must pass `npm run lint` and `npm run build` in `frontend/`. CI runs all four on every PR.
+6.  **Single Version Source**: The app version comes from the root `package.json`: the web app reads it via the `__APP_VERSION__` define in `frontend/vite.config.ts`, the CLI reads the file at startup. Do not hardcode version strings.
 7.  **Single Agent Instructions File**: `CLAUDE.md` is the only agent instructions file for this repo. Keep it current when structure or conventions change, and do not add parallel files such as `GEMINI.md` or `AGENTS.md`.
+8.  **Single Defaults Source**: Plan defaults (GFs, setpoints, rates, model, 6 m floor) live in `PLAN_DEFAULTS` in `shared/config.ts`. The engine, CLI and web form all read them from there; do not restate default values elsewhere.
 
 ## Key Files
 
@@ -62,7 +71,7 @@ single non-interactive pass — this is what CI executes.
 - `shared/engine/deco_engine.ts`: Physiological core (ZHL-16B/C, CNS, OTU).
 - `shared/engine/planner.ts`: Planning orchestrator and gas consumption.
 - `shared/engine/*.test.ts`: Vitest suites for the engine and planner.
-- `shared/config.ts`: `GASES` (standard diving gas database) and `CYLINDERS`.
+- `shared/config.ts`: `GASES` (standard diving gas database), `CYLINDERS` and `PLAN_DEFAULTS`.
 - `shared/types.ts`: Shared interfaces for CLI and Frontend.
 
 **Entry points:**
@@ -72,7 +81,8 @@ single non-interactive pass — this is what CI executes.
 
 **Config & tooling:**
 - `frontend/vite.config.ts`: `@shared/*` alias for the dev server, plus the `__APP_VERSION__` (from the root `package.json`) and `__BUILD_TIME__` (build timestamp) defines that `InfoModal` renders.
-- `.github/workflows/ci.yml`: Engine tests and frontend build.
+- `tsconfig.json`: Strict typecheck settings for `bin/` and `shared/`.
+- `.github/workflows/ci.yml`: Typecheck, engine tests, frontend lint and build.
 - `.github/workflows/deploy.yml`: GitHub Pages deployment.
 - `.claude/launch.json`: Dev-server config for Claude Code's preview pane.
 - `CLAUDE.md`: Agent instructions (this file).

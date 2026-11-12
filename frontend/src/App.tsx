@@ -1,12 +1,15 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, lazy, Suspense } from 'react';
 import './App.css';
 import DiveForm from './components/DiveForm';
-import TissueChart from './components/TissueChart';
-import DiveProfileChart from './components/DiveProfileChart';
 import InfoModal from './components/InfoModal';
 import type { DivePlanResponse, DivePlanRequest } from '@shared/types';
 import { Activity, AlertTriangle, Settings, ChevronUp, Info } from 'lucide-react';
 import { planDive, calculateGasConsumption } from '@shared/engine/planner';
+
+// The charts pull in Recharts, the bulk of the bundle. Loading them on demand
+// keeps the form and the schedule table out of that download.
+const TissueChart = lazy(() => import('./components/TissueChart'));
+const DiveProfileChart = lazy(() => import('./components/DiveProfileChart'));
 
 function App() {
   const [plan, setPlan] = useState<DivePlanResponse | null>(null);
@@ -23,22 +26,7 @@ function App() {
     
     setTimeout(() => {
       try {
-        const result = planDive(
-          request.depth,
-          request.bottom_time,
-          request.bottom_gas,
-          request.deco_gases,
-          request.gf_low / 100,
-          request.gf_high / 100,
-          request.is_ccr,
-          request.setpoint,
-          request.deco_setpoint,
-          request.deco_gas_setpoint,
-          request.descent_rate,
-          request.ascent_rate,
-          request.force_6m,
-          request.model
-        );
+        const result = planDive(request);
 
         const gasReqs = calculateGasConsumption(
           result.schedule,
@@ -132,7 +120,7 @@ function App() {
           <div className="dashboard-row profile-hero">
             <div className="panel profile-panel">
               <div className="panel-header-compact">DIVE PROFILE</div>
-              {plan && <DiveProfileChart data={plan.profile} />}
+              {plan && <Suspense fallback={null}><DiveProfileChart data={plan.profile} /></Suspense>}
             </div>
           </div>
 
@@ -151,7 +139,7 @@ function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {plan?.schedule.map((entry: any, i: number) => (
+                    {plan?.schedule.map((entry, i) => (
                       <tr key={i}>
                         <td>{entry.depth}m</td>
                         <td>{entry.time}min</td>
@@ -169,7 +157,7 @@ function App() {
           <div className="dashboard-row secondary-visuals">
             <div className="panel tissue-panel">
               <div className="panel-header-compact">TISSUE LOADING</div>
-              {plan && <TissueChart data={plan.tissue_loads} />}
+              {plan && <Suspense fallback={null}><TissueChart data={plan.tissue_loads} /></Suspense>}
             </div>
             <div className="panel gas-requirements-panel">
               <div className="panel-header-compact">GAS REQUIREMENTS</div>
