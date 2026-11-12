@@ -152,6 +152,8 @@ or the workflow itself.
 -   `.github/workflows/`: `ci.yml` (tests + builds) and `deploy.yml` (GitHub Pages).
 -   `.claude/launch.json`: Dev-server definition (`web` → `npm run web` on port 5173)
     used by Claude Code's preview tooling. Not required to run the project by hand.
+-   `CLAUDE.md`: Instructions for AI coding agents (architecture, conventions, key files).
+    The single agent instructions file for this repo.
 
 ---
 
