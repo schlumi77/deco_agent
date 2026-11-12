@@ -1,6 +1,6 @@
-# GEMINI.md
+# CLAUDE.md
 
-This file serves as the foundational instructional context for Gemini CLI when interacting with the **Deco_agent** project.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in the **Deco_agent** project.
 
 ## Project Overview
 
@@ -54,6 +54,7 @@ single non-interactive pass — this is what CI executes.
 4.  **Offline-First**: The web app is designed to run the engine entirely in the browser. Do not introduce server-side dependencies for core planning.
 5.  **Keep CI Green**: Any engine change must pass `npm run test -- run`, and any frontend change must pass `npm run build` in `frontend/`. CI runs both on every PR.
 6.  **Single Version Source**: The app version comes from the root `package.json` via the `__APP_VERSION__` define in `frontend/vite.config.ts`. Do not hardcode version strings in components.
+7.  **Single Agent Instructions File**: `CLAUDE.md` is the only agent instructions file for this repo. Keep it current when structure or conventions change, and do not add parallel files such as `GEMINI.md` or `AGENTS.md`.
 
 ## Key Files
 
@@ -74,4 +75,4 @@ single non-interactive pass — this is what CI executes.
 - `.github/workflows/ci.yml`: Engine tests and frontend build.
 - `.github/workflows/deploy.yml`: GitHub Pages deployment.
 - `.claude/launch.json`: Dev-server config for Claude Code's preview pane.
-- `GEMINI.md`: Project instructions (this file).
+- `CLAUDE.md`: Agent instructions (this file).
