@@ -1,8 +1,8 @@
 import { DecoEngine, calculateGasDensity, SURFACE_PRESSURE, WATER_VAPOR_PRESSURE } from './deco_engine.js';
-import type { ScheduleEntry, Gas, ProfileEntry, DivePlanResponse, DivePlanRequest, DivePlanInput, GasRequirements } from '../types.js';
+import type { ScheduleEntry, Gas, ProfileEntry, DivePlanResponse, DivePlanRequest, DivePlanInput, GasRequirements, CylinderCheck, CylinderKit } from '../types.js';
 export type { Gas, DivePlanInput };
-import { GASES, PLAN_DEFAULTS } from '../config.js';
-export { GASES, PLAN_DEFAULTS };
+import { GASES, PLAN_DEFAULTS, CYLINDERS, OC_BOTTOM_CYLINDER_NAME } from '../config.js';
+export { GASES, PLAN_DEFAULTS, CYLINDERS, OC_BOTTOM_CYLINDER_NAME };
 
 export function calculateMod(fo2: number, maxPo2: number, surfacePressure = SURFACE_PRESSURE): number {
     if (fo2 <= 0) return Infinity;
@@ -400,6 +400,7 @@ function toRequest(input: DivePlanInput): DivePlanRequest {
         ...input,
         setpoint,
         deco_setpoint: input.deco_setpoint ?? setpoint,
+        cylinders: { ...PLAN_DEFAULTS.cylinders, ...input.cylinders },
     };
 }
 
@@ -424,32 +425,72 @@ export function planBailout(input: DivePlanInput): DivePlanResponse {
 // Reserve factor applied to all open-circuit gas requirements.
 export const GAS_RESERVE_FACTOR = 1.5;
 
-// Gas to carry for a planned dive, in litres. On an OC dive the open-circuit
-// requirement is the dive's own gas; on a CCR dive it is the gas for the
-// bailout ascent (computed with planBailout() unless passed in), and the
-// onboard oxygen and diluent are estimated from the run time.
+// Gas to carry for a planned dive, in litres, checked against the cylinder
+// kit. On an OC dive the open-circuit requirement is the dive's own gas; on a
+// CCR dive it is the gas for the bailout ascent (computed with planBailout()
+// unless passed in), and the onboard oxygen and diluent are estimated from the
+// run time. The breathing rate, oxygen use and cylinders come from the input,
+// falling back to PLAN_DEFAULTS.
 export function calculateGasRequirements(
     input: DivePlanInput,
     plan: DivePlanResponse,
-    bailoutPlan: DivePlanResponse | null = null,
-    sacRate = 15.0,
-    o2Consumption = 1.0
+    bailoutPlan: DivePlanResponse | null = null
 ): GasRequirements {
-    requirePositive(sacRate, 'SAC rate');
-    const isCcr = input.is_ccr ?? PLAN_DEFAULTS.is_ccr;
-    const ocPlan = isCcr ? (bailoutPlan ?? planBailout(input)) : plan;
+    const request = toRequest(input);
+    requirePositive(request.sac_rate, 'SAC rate');
+    if (request.is_ccr) requirePositive(request.o2_consumption, 'Oxygen consumption');
+    for (const role of Object.keys(CYLINDERS) as (keyof CylinderKit)[]) {
+        const cyl = request.cylinders[role];
+        requirePositive(cyl?.volume, `${CYLINDERS[role].name} cylinder volume`);
+        requirePositive(cyl?.pressure, `${CYLINDERS[role].name} cylinder pressure`);
+    }
+
+    const ocPlan = request.is_ccr ? (bailoutPlan ?? planBailout(request)) : plan;
 
     const open_circuit: Record<string, number> = {};
     for (const [gas, barMinutes] of Object.entries(ocPlan.gas_usage)) {
-        open_circuit[gas] = barMinutes * sacRate * GAS_RESERVE_FACTOR;
+        open_circuit[gas] = barMinutes * request.sac_rate * GAS_RESERVE_FACTOR;
     }
 
     const onboard: Record<string, number> = {};
-    if (isCcr) {
+    if (request.is_ccr) {
         const runTime = plan.profile.length > 0 ? plan.profile[plan.profile.length - 1].time : 0;
-        onboard["Onboard Oxygen"] = runTime * o2Consumption;
-        onboard["Onboard Diluent"] = 5.0 * (input.depth / 10.0) + 20.0;
+        onboard["Onboard Oxygen"] = runTime * request.o2_consumption;
+        onboard["Onboard Diluent"] = 5.0 * (request.depth / 10.0) + 20.0;
     }
 
-    return { open_circuit, onboard };
+    // Free gas a cylinder holds at its fill pressure (ideal gas).
+    const capacity = (role: keyof CylinderKit) =>
+        request.cylinders[role].volume * request.cylinders[role].pressure;
+    const cylinders: CylinderCheck[] = [];
+    const bottomGas = request.bottom_gas;
+
+    // On CCR the diluent cylinder feeds both the loop and the bailout on diluent.
+    const bottomSupplies: string[] = [];
+    let bottomRequired = 0;
+    if (open_circuit[bottomGas] !== undefined) {
+        bottomSupplies.push(request.is_ccr ? `${bottomGas} (bailout)` : bottomGas);
+        bottomRequired += open_circuit[bottomGas];
+    }
+    if (request.is_ccr) {
+        bottomSupplies.push(`${bottomGas} (onboard diluent)`);
+        bottomRequired += onboard["Onboard Diluent"];
+    }
+    const bottomName = request.is_ccr ? CYLINDERS.bottom.name : OC_BOTTOM_CYLINDER_NAME;
+    cylinders.push({ cylinder: bottomName, supplies: bottomSupplies, required: bottomRequired, available: capacity('bottom') });
+
+    for (const [gas, required] of Object.entries(open_circuit)) {
+        if (gas === bottomGas) continue;
+        cylinders.push({ cylinder: CYLINDERS.stage.name, supplies: [gas], required, available: capacity('stage') });
+    }
+
+    if (request.is_ccr) {
+        cylinders.push({ cylinder: CYLINDERS.oxygen.name, supplies: ['Onboard oxygen'], required: onboard["Onboard Oxygen"], available: capacity('oxygen') });
+    }
+
+    const warnings = cylinders
+        .filter(c => c.required > c.available)
+        .map(c => `Not enough gas in ${c.cylinder} cylinder for ${c.supplies.join(' + ')}: needs ${Math.ceil(c.required)} L, holds ${Math.floor(c.available)} L`);
+
+    return { open_circuit, onboard, cylinders, warnings };
 }

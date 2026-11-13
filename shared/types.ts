@@ -28,12 +28,41 @@ export interface TissueLoad {
     load_percent: number;
 }
 
+// A cylinder: water capacity in litres and fill pressure in bar.
+export interface Cylinder {
+    volume: number;
+    pressure: number;
+}
+
+// The cylinders gas requirements are checked against.
+// - bottom: the bottom gas on OC; on CCR the off-board diluent/bailout
+//   cylinder, which feeds the loop's diluent and the bailout on diluent.
+// - stage: one per deco gas, on OC and for CCR bailout.
+// - oxygen: the CCR's onboard oxygen.
+export interface CylinderKit {
+    bottom: Cylinder;
+    stage: Cylinder;
+    oxygen: Cylinder;
+}
+
+// One cylinder compared with what the plan needs from it, in litres.
+export interface CylinderCheck {
+    cylinder: string;
+    supplies: string[];
+    required: number;
+    available: number;
+}
+
 // Litres of gas to carry, including the reserve factor. `open_circuit` is the
 // dive's own gas on an OC dive and the bailout gas on a CCR dive; `onboard`
-// (oxygen and diluent cylinders) is filled only for CCR dives.
+// (oxygen and diluent cylinders) is filled only for CCR dives. `cylinders`
+// compares those requirements with the cylinder kit, and `warnings` names
+// every cylinder that holds too little.
 export interface GasRequirements {
     open_circuit: Record<string, number>;
     onboard: Record<string, number>;
+    cylinders: CylinderCheck[];
+    warnings: string[];
 }
 
 export interface DivePlanResponse {
@@ -66,10 +95,16 @@ export interface DivePlanRequest {
     ascent_rate: number;
     force_6m: boolean;
     model: string;
+    // Gas planning; planDive() ignores these.
+    sac_rate: number;        // open-circuit breathing rate at the surface, L/min
+    o2_consumption: number;  // CCR metabolic oxygen use, L/min
+    cylinders: CylinderKit;
 }
 
 // What planDive() accepts: the dive itself is required, everything else falls
 // back to PLAN_DEFAULTS in config.ts. An omitted deco_setpoint follows setpoint.
+// Cylinders may be given per role; the rest come from the defaults.
 export type DivePlanInput =
     Pick<DivePlanRequest, 'depth' | 'bottom_time' | 'bottom_gas'> &
-    Partial<Omit<DivePlanRequest, 'depth' | 'bottom_time' | 'bottom_gas'>>;
+    Partial<Omit<DivePlanRequest, 'depth' | 'bottom_time' | 'bottom_gas' | 'cylinders'>> &
+    { cylinders?: Partial<CylinderKit> };

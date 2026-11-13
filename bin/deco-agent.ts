@@ -9,6 +9,7 @@ import {
     GAS_RESERVE_FACTOR,
     GASES, 
     PLAN_DEFAULTS,
+    CYLINDERS,
     calculateMod, 
     calculateMinOd, 
     calculateEnd 
@@ -19,6 +20,15 @@ function parseNumber(value: string): number {
     if (value.trim() === '' || !Number.isFinite(n)) throw new InvalidArgumentError('Not a number.');
     return n;
 }
+
+// A cylinder as <litres>@<bar>, e.g. 11.1@207.
+function parseCylinder(value: string): { volume: number; pressure: number } {
+    const m = /^\s*([0-9]*\.?[0-9]+)\s*@\s*([0-9]*\.?[0-9]+)\s*$/.exec(value);
+    if (!m) throw new InvalidArgumentError('Use <litres>@<bar>, e.g. 11.1@207.');
+    return { volume: Number(m[1]), pressure: Number(m[2]) };
+}
+
+const cylinderDefault = (c: { volume: number; pressure: number }) => `${c.volume}@${c.pressure}`;
 
 function parseChoice(choices: string[]) {
     return (value: string): string => {
@@ -84,6 +94,11 @@ program
   .option('--asc-rate <number>', 'Ascent Rate m/min', parseNumber, PLAN_DEFAULTS.ascent_rate)
   .option('--model <string>', 'Bühlmann Model (B/C)', parseChoice(['b', 'c']), PLAN_DEFAULTS.model.toLowerCase())
   .option('--no-force-6m', 'Allow 3m stops')
+  .option('--sac <number>', 'Open-circuit breathing rate at the surface, L/min', parseNumber, PLAN_DEFAULTS.sac_rate)
+  .option('--o2-rate <number>', 'CCR metabolic oxygen use, L/min', parseNumber, PLAN_DEFAULTS.o2_consumption)
+  .option('--bottom-cyl <litres@bar>', `Bottom gas cylinder on OC; on CCR the ${CYLINDERS.bottom.name.toLowerCase()} cylinder for diluent and bailout on diluent (default: ${cylinderDefault(CYLINDERS.bottom)})`, parseCylinder)
+  .option('--stage-cyl <litres@bar>', `${CYLINDERS.stage.name} cylinder, one per deco gas (default: ${cylinderDefault(CYLINDERS.stage)})`, parseCylinder)
+  .option('--o2-cyl <litres@bar>', `CCR onboard ${CYLINDERS.oxygen.name.toLowerCase()} cylinder (default: ${cylinderDefault(CYLINDERS.oxygen)})`, parseCylinder)
   .action((options) => {
     const isCcr = options.mode === 'ccr';
     const decoGases = ["Oxygen", "Tx 50/15", "Tx 35/35", "Tx 24/35", "Tx 17/70"];
@@ -104,6 +119,13 @@ program
             ascent_rate: options.ascRate,
             force_6m: options.force6m !== false,
             model: options.model,
+            sac_rate: options.sac,
+            o2_consumption: options.o2Rate,
+            cylinders: {
+                ...(options.bottomCyl && { bottom: options.bottomCyl }),
+                ...(options.stageCyl && { stage: options.stageCyl }),
+                ...(options.o2Cyl && { oxygen: options.o2Cyl }),
+            },
         };
         const result = planDive(request);
         const bailout = isCcr ? planBailout(request) : null;
@@ -129,16 +151,22 @@ program
         if (isCcr) {
             console.log(chalk.bold('\nOnboard Gas Requirements (Minimum for Dive):'));
             Object.entries(gasReqs.onboard).forEach(([gas, vol]) => {
-                console.log(`  ${gas.padEnd(15)}: ${vol.toFixed(0).padStart(5)} L`);
+                console.log(`  ${gas.padEnd(15)}: ${String(Math.ceil(vol)).padStart(5)} L`);
             });
         }
 
-        const reserve = `${GAS_RESERVE_FACTOR}x reserve, SAC 15 L/min`;
+        const reserve = `${GAS_RESERVE_FACTOR}x reserve, SAC ${options.sac} L/min`;
         console.log(chalk.bold(isCcr
             ? `\nBailout Gas Requirements (OC ascent from the end of bottom time, ${reserve}):`
             : `\nGas Requirements (${reserve}):`));
         Object.entries(gasReqs.open_circuit).forEach(([gas, vol]) => {
-            console.log(`  ${gas.padEnd(15)}: ${vol.toFixed(0).padStart(5)} L`);
+            console.log(`  ${gas.padEnd(15)}: ${String(Math.ceil(vol)).padStart(5)} L`);
+        });
+
+        console.log(chalk.bold('\nCylinder Check:'));
+        gasReqs.cylinders.forEach(c => {
+            const status = c.required > c.available ? chalk.red('SHORT') : chalk.green('OK');
+            console.log(`  ${c.cylinder.padEnd(15)}: ${String(Math.ceil(c.required)).padStart(5)} / ${String(Math.floor(c.available)).padStart(5)} L  ${status}  ${chalk.gray(c.supplies.join(' + '))}`);
         });
 
         console.log(chalk.bold('\nOxygen Toxicity:'));
@@ -148,7 +176,7 @@ program
         console.log(chalk.bold('\nSurface Pressure Load:'));
         console.log(`  Surface GF: ${result.surface_gf.toFixed(1).padStart(6)} %`);
 
-        const warnings = [...result.warnings, ...(bailout?.warnings ?? [])];
+        const warnings = [...result.warnings, ...(bailout?.warnings ?? []), ...gasReqs.warnings];
         if (warnings.length > 0) {
             console.log(chalk.bold.red('\nSafety Warnings:'));
             warnings.forEach(w => console.log(chalk.red(`  !!! ${w} !!!`)));

@@ -750,3 +750,8 @@ body {
     text-align: right;
   }
 }
+
+.gas-row .vol.short {
+  color: var(--warn-color);
+  font-weight: bold;
+}

@@ -29,12 +29,13 @@ function App() {
       try {
         const result = planDive(request);
         const bailout = request.is_ccr ? planBailout(request) : null;
+        const gasRequirements = calculateGasRequirements(request, result, bailout);
 
         setIsCcr(request.is_ccr);
         setPlan({
           ...result,
-          warnings: [...result.warnings, ...(bailout?.warnings ?? [])],
-          gas_requirements: calculateGasRequirements(request, result, bailout),
+          warnings: [...result.warnings, ...(bailout?.warnings ?? []), ...gasRequirements.warnings],
+          gas_requirements: gasRequirements,
         });
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -161,7 +162,7 @@ function App() {
                       {Object.entries(plan.gas_requirements.onboard).map(([gas, vol]) => (
                         <div key={gas} className="gas-row">
                           <span>{gas.replace('Onboard ', '')}</span>
-                          <span className="vol">{Math.round(vol as number)}L</span>
+                          <span className="vol">{Math.ceil(vol as number)}L</span>
                         </div>
                       ))}
                     </div>
@@ -171,7 +172,18 @@ function App() {
                     {Object.entries(plan.gas_requirements.open_circuit).map(([gas, vol]) => (
                       <div key={gas} className="gas-row">
                         <span>{gas}</span>
-                        <span className="vol">{Math.round(vol as number)}L</span>
+                        <span className="vol">{Math.ceil(vol as number)}L</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="gas-group">
+                    <div className="gas-group-label">CYLINDERS (NEED / HOLD)</div>
+                    {plan.gas_requirements.cylinders.map((c, i) => (
+                      <div key={i} className="gas-row" title={c.supplies.join(' + ')}>
+                        <span>{c.cylinder}: {c.supplies.join(' + ')}</span>
+                        <span className={c.required > c.available ? 'vol short' : 'vol'}>
+                          {Math.ceil(c.required)} / {Math.floor(c.available)}L
+                        </span>
                       </div>
                     ))}
                   </div>

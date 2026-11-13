@@ -5,6 +5,7 @@ import {
     calculateGasRequirements,
     GAS_RESERVE_FACTOR,
     PLAN_DEFAULTS,
+    CYLINDERS,
 } from './planner.js';
 import { SURFACE_PRESSURE } from './deco_engine.js';
 import type { DivePlanResponse } from '../types.js';
@@ -326,7 +327,8 @@ describe('Gas requirements and bailout planning', () => {
     it('converts OC gas usage to litres with SAC rate and reserve factor', () => {
         const dive = { depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES };
         const res = planDive(dive);
-        const req = calculateGasRequirements(dive, res, null, 15);
+        const req = calculateGasRequirements(dive, res);
+        expect(PLAN_DEFAULTS.sac_rate).toBe(15);
         expect(Object.keys(req.open_circuit)).toEqual(['Air', 'Tx 50/15', 'Oxygen']);
         for (const [gas, barMinutes] of Object.entries(res.gas_usage)) {
             expect(req.open_circuit[gas]).toBeCloseTo(barMinutes * 15 * GAS_RESERVE_FACTOR, 6);
@@ -357,7 +359,7 @@ describe('Gas requirements and bailout planning', () => {
 
     it('sizes CCR bailout gas from the ascent only, not the bottom time', () => {
         const loop = planDive(CCR_DIVE);
-        const req = calculateGasRequirements(CCR_DIVE, loop, null, 15);
+        const req = calculateGasRequirements(CCR_DIVE, loop);
         const bottomTimeOnOc = (SURFACE_PRESSURE + 60 / 10) * 25 * 15 * GAS_RESERVE_FACTOR;
         expect(req.open_circuit['Tx 18/45']).toBeGreaterThan(0);
         expect(req.open_circuit['Tx 18/45']).toBeLessThan(bottomTimeOnOc / 4);
@@ -375,10 +377,10 @@ describe('Gas requirements and bailout planning', () => {
     it('scales open-circuit requirements linearly with SAC rate', () => {
         const dive = { depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES };
         const res = planDive(dive);
-        const at15 = calculateGasRequirements(dive, res, null, 15).open_circuit;
-        const at20 = calculateGasRequirements(dive, res, null, 20).open_circuit;
+        const at15 = calculateGasRequirements({ ...dive, sac_rate: 15 }, res).open_circuit;
+        const at20 = calculateGasRequirements({ ...dive, sac_rate: 20 }, res).open_circuit;
         for (const gas of Object.keys(at15)) expect(at20[gas]).toBeCloseTo(at15[gas] * 20 / 15, 6);
-        expect(() => calculateGasRequirements(dive, res, null, 0)).toThrow(/SAC rate/);
+        expect(() => calculateGasRequirements({ ...dive, sac_rate: 0 }, res)).toThrow(/SAC rate/);
     });
 
     it('reports open-circuit limits of the diluent as bailout warnings', () => {
@@ -392,5 +394,67 @@ describe('Gas requirements and bailout planning', () => {
 
     it('refuses to plan a bailout for an open-circuit dive', () => {
         expect(() => planBailout({ depth: 40, bottom_time: 20, bottom_gas: 'Air' })).toThrow(/CCR dives only/);
+    });
+});
+
+describe('Cylinder checks', () => {
+    // Regression: the README promised warnings for gas volume violations, but
+    // CYLINDERS was never used and requirements were never compared with what
+    // the cylinders hold.
+
+    const OC_DIVE = { depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES };
+    const CCR_DIVE = { depth: 60, bottom_time: 25, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES, is_ccr: true, setpoint: 1.3 };
+    const litres = (c: { volume: number; pressure: number }) => c.volume * c.pressure;
+
+    it('checks the bottom gas against the bottom cylinder and each deco gas against a stage', () => {
+        const req = calculateGasRequirements(OC_DIVE, planDive(OC_DIVE));
+        expect(req.cylinders.map(c => [c.cylinder, c.supplies])).toEqual([
+            ['Bottom', ['Air']],
+            ['Stage', ['Tx 50/15']],
+            ['Stage', ['Oxygen']],
+        ]);
+        expect(req.cylinders[0].required).toBeCloseTo(req.open_circuit['Air'], 9);
+        expect(req.cylinders[0].available).toBe(litres(CYLINDERS.bottom));
+        expect(req.cylinders[1].available).toBe(litres(CYLINDERS.stage));
+    });
+
+    it('warns for every cylinder that holds less than the plan needs', () => {
+        const ok = calculateGasRequirements(OC_DIVE, planDive(OC_DIVE));
+        expect(ok.warnings).toEqual([]);
+
+        const smallStage = { ...OC_DIVE, cylinders: { stage: { volume: 1, pressure: 200 } } };
+        const req = calculateGasRequirements(smallStage, planDive(smallStage));
+        expect(req.warnings).toHaveLength(2);
+        expect(req.warnings[0]).toMatch(/^Not enough gas in Stage cylinder for Tx 50\/15: needs \d+ L, holds 200 L$/);
+        // The bottom cylinder keeps its default size.
+        expect(req.cylinders[0].available).toBe(litres(CYLINDERS.bottom));
+    });
+
+    it('draws CCR onboard diluent and bailout on diluent from the same cylinder', () => {
+        const req = calculateGasRequirements(CCR_DIVE, planDive(CCR_DIVE));
+        const bottom = req.cylinders[0];
+        expect(bottom.cylinder).toBe('Diluent/Bailout');
+        expect(bottom.supplies).toEqual(['Tx 18/45 (bailout)', 'Tx 18/45 (onboard diluent)']);
+        expect(bottom.required).toBeCloseTo(req.open_circuit['Tx 18/45'] + req.onboard['Onboard Diluent'], 9);
+
+        const oxygen = req.cylinders[req.cylinders.length - 1];
+        expect(oxygen).toMatchObject({ cylinder: 'Oxygen', supplies: ['Onboard oxygen'], available: litres(CYLINDERS.oxygen) });
+        expect(oxygen.required).toBeCloseTo(req.onboard['Onboard Oxygen'], 9);
+    });
+
+    it('scales onboard oxygen with the oxygen consumption rate', () => {
+        const loop = planDive(CCR_DIVE);
+        const at1 = calculateGasRequirements(CCR_DIVE, loop).onboard['Onboard Oxygen'];
+        const at2 = calculateGasRequirements({ ...CCR_DIVE, o2_consumption: 2 }, loop).onboard['Onboard Oxygen'];
+        expect(at2).toBeCloseTo(at1 * 2, 9);
+    });
+
+    it('rejects invalid cylinders and rates', () => {
+        const res = planDive(OC_DIVE);
+        expect(() => calculateGasRequirements({ ...OC_DIVE, cylinders: { stage: { volume: 0, pressure: 200 } } }, res)).toThrow(/Stage cylinder volume/);
+        expect(() => calculateGasRequirements({ ...OC_DIVE, cylinders: { bottom: { volume: 12, pressure: -1 } } }, res)).toThrow(/Diluent\/Bailout cylinder pressure/);
+        expect(() => calculateGasRequirements({ ...CCR_DIVE, o2_consumption: 0 }, planDive(CCR_DIVE))).toThrow(/Oxygen consumption/);
+        // Oxygen consumption only matters on the loop.
+        expect(() => calculateGasRequirements({ ...OC_DIVE, o2_consumption: 0 }, res)).not.toThrow();
     });
 });

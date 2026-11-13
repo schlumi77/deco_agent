@@ -19,7 +19,8 @@
     -   Calculates **MOD**, **MinOD**, **END**, and **Gas Density**.
     -   Supports **mCCR (Constant Setpoint)** and **Open Circuit** planning.
     -   Automated **Bailout Schedule** for CCR dives: the ascent is re-planned on open circuit from the end of bottom time (the worst case), and bailout gas is sized from that ascent.
-    -   **Gas requirements** from the gas actually breathed in each segment, at a 15 L/min SAC with a 1.5x reserve.
+    -   **Gas requirements** from the gas actually breathed in each segment, at an adjustable SAC (default 15 L/min) with a 1.5x reserve.
+    -   **Cylinder checks**: requirements are compared with the cylinder kit (bottom or diluent/bailout cylinder, one stage per deco gas, CCR onboard oxygen), and any cylinder that holds too little raises a warning. Sizes are set with `--bottom-cyl`, `--stage-cyl` and `--o2-cyl` (`<litres>@<bar>`) on the CLI, or in the web form.
 -   **Safety First**:
     -   Integrated warnings for high CNS (>80%), excessive OTUs (>300), and gas volume violations.
     -   **6-meter Decompression Floor**: Enforces a minimum stop depth of 6m for technical safety.
@@ -140,7 +141,7 @@ itself.
     -   `deco_engine.test.ts` / `planner.test.ts`: Vitest suites for the engine and planner.
 -   `shared/`: Shared configuration and types.
     -   `types.ts`: TypeScript interfaces used by CLI and Frontend.
-    -   `config.ts`: `GASES` (standard diving gas database), `CYLINDERS` (common cylinder sizes) and
+    -   `config.ts`: `GASES` (standard diving gas database), `CYLINDERS` (the default cylinder kit) and
         `PLAN_DEFAULTS` (the defaults shared by the engine, CLI and web form).
 -   `bin/deco-agent.ts`: Node.js CLI entry point.
 -   `frontend/src/`: React source code, utilizing the shared engine.
