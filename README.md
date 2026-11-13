@@ -18,7 +18,8 @@
 -   **Gas Management & Physics**:
     -   Calculates **MOD**, **MinOD**, **END**, and **Gas Density**.
     -   Supports **mCCR (Constant Setpoint)** and **Open Circuit** planning.
-    -   Automated **Bailout Schedule** generation with gas consumption analysis.
+    -   Automated **Bailout Schedule** for CCR dives: the ascent is re-planned on open circuit from the end of bottom time (the worst case), and bailout gas is sized from that ascent.
+    -   **Gas requirements** from the gas actually breathed in each segment, at a 15 L/min SAC with a 1.5x reserve.
 -   **Safety First**:
     -   Integrated warnings for high CNS (>80%), excessive OTUs (>300), and gas volume violations.
     -   **6-meter Decompression Floor**: Enforces a minimum stop depth of 6m for technical safety.
@@ -134,7 +135,7 @@ or the workflow itself.
 
 -   `shared/engine/`: The physiological core and planning orchestrator.
     -   `deco_engine.ts`: ZHL-16B/C math, CNS/OTU tracking, Schreiner logic.
-    -   `planner.ts`: Stop-by-stop planning logic.
+    -   `planner.ts`: Stop-by-stop planning, the open-circuit bailout re-plan (`planBailout`) and gas requirements.
     -   `deco_engine.test.ts` / `planner.test.ts`: Vitest suites for the engine and planner.
 -   `shared/`: Shared configuration and types.
     -   `types.ts`: TypeScript interfaces used by CLI and Frontend.

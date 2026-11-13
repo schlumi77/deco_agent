@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { planDive, PLAN_DEFAULTS } from './planner.js';
+import {
+    planDive,
+    planBailout,
+    calculateGasRequirements,
+    GAS_RESERVE_FACTOR,
+    PLAN_DEFAULTS,
+} from './planner.js';
+import { SURFACE_PRESSURE } from './deco_engine.js';
 import type { DivePlanResponse } from '../types.js';
 
 const DECO_GASES = ['Oxygen', 'Tx 50/15'];
@@ -292,5 +299,98 @@ describe('Request defaults', () => {
         const lower = planDive({ ...dive, deco_setpoint: 1.0 });
         expect(followed).toEqual(same);
         expect(lower.schedule).not.toEqual(followed.schedule);
+    });
+});
+
+describe('Gas requirements and bailout planning', () => {
+    // Regression: gas requirements were rebuilt from the schedule rows. On CCR
+    // dives that charged the descent and the whole bottom time to open circuit,
+    // and recovered gas names by parsing display strings like
+    // "CCR Tx 50/15 SP 1.4 [76/7]". Bailout is now a real open-circuit ascent
+    // re-planned from the end of bottom time, and gas use is tracked per
+    // segment as it is breathed.
+
+    const CCR_DIVE = { depth: 60, bottom_time: 25, bottom_gas: 'Tx 18/45', deco_gases: DECO_GASES, is_ccr: true, setpoint: 1.3 };
+    const runTime = (res: DivePlanResponse) => res.profile[res.profile.length - 1].time;
+
+    it('charges OC descent and bottom time to the bottom gas at ambient pressure', () => {
+        // At 20 m Tx 50/15 is already within its MOD, so the ascent switches to
+        // it straight from the bottom and air covers only descent and bottom.
+        const res = planDive({ depth: 20, bottom_time: 15, bottom_gas: 'Air', deco_gases: ['Tx 50/15'] });
+        const descent = (SURFACE_PRESSURE + 20 / 20) * (20 / PLAN_DEFAULTS.descent_rate);
+        const bottom = (SURFACE_PRESSURE + 20 / 10) * 15;
+        expect(res.gas_usage['Air']).toBeCloseTo(descent + bottom, 9);
+        expect(res.gas_usage['Tx 50/15']).toBeGreaterThan(0);
+    });
+
+    it('converts OC gas usage to litres with SAC rate and reserve factor', () => {
+        const dive = { depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES };
+        const res = planDive(dive);
+        const req = calculateGasRequirements(dive, res, null, 15);
+        expect(Object.keys(req.open_circuit)).toEqual(['Air', 'Tx 50/15', 'Oxygen']);
+        for (const [gas, barMinutes] of Object.entries(res.gas_usage)) {
+            expect(req.open_circuit[gas]).toBeCloseTo(barMinutes * 15 * GAS_RESERVE_FACTOR, 6);
+        }
+        // Air covers at least the descent and the full bottom time.
+        const descent = (SURFACE_PRESSURE + 50 / 20) * (50 / PLAN_DEFAULTS.descent_rate);
+        const bottom = (SURFACE_PRESSURE + 50 / 10) * 20;
+        expect(res.gas_usage['Air']).toBeGreaterThan(descent + bottom);
+        expect(req.onboard).toEqual({});
+    });
+
+    it('records no open-circuit gas while on the loop', () => {
+        expect(planDive(CCR_DIVE).gas_usage).toEqual({});
+    });
+
+    it('bails out from the CCR tissue state at the end of bottom time', () => {
+        const loop = planDive(CCR_DIVE);
+        const bailout = planBailout(CCR_DIVE);
+        // Same descent and bottom on the loop, so the same loading at bailout.
+        expect(bailout.schedule[0]).toEqual(loop.schedule[0]);
+        expect(bailout.schedule[0].gas).toContain('CCR SP 1.3');
+        // Every ascent row is open circuit.
+        for (const row of bailout.schedule.slice(1)) expect(row.gas).not.toContain('CCR');
+        // Fixed-fraction OC gases carry less oxygen than a 1.4 bar loop, so
+        // this ascent takes longer.
+        expect(runTime(bailout)).toBeGreaterThan(runTime(loop));
+    });
+
+    it('sizes CCR bailout gas from the ascent only, not the bottom time', () => {
+        const loop = planDive(CCR_DIVE);
+        const req = calculateGasRequirements(CCR_DIVE, loop, null, 15);
+        const bottomTimeOnOc = (SURFACE_PRESSURE + 60 / 10) * 25 * 15 * GAS_RESERVE_FACTOR;
+        expect(req.open_circuit['Tx 18/45']).toBeGreaterThan(0);
+        expect(req.open_circuit['Tx 18/45']).toBeLessThan(bottomTimeOnOc / 4);
+        expect(Object.keys(req.open_circuit)).toEqual(['Tx 18/45', 'Tx 50/15', 'Oxygen']);
+        expect(Object.keys(req.onboard)).toEqual(['Onboard Oxygen', 'Onboard Diluent']);
+        expect(req.onboard['Onboard Oxygen']).toBeCloseTo(runTime(loop), 6);
+    });
+
+    it('uses a bailout plan that is passed in instead of planning it again', () => {
+        const loop = planDive(CCR_DIVE);
+        const bailout = planBailout(CCR_DIVE);
+        expect(calculateGasRequirements(CCR_DIVE, loop, bailout)).toEqual(calculateGasRequirements(CCR_DIVE, loop));
+    });
+
+    it('scales open-circuit requirements linearly with SAC rate', () => {
+        const dive = { depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES };
+        const res = planDive(dive);
+        const at15 = calculateGasRequirements(dive, res, null, 15).open_circuit;
+        const at20 = calculateGasRequirements(dive, res, null, 20).open_circuit;
+        for (const gas of Object.keys(at15)) expect(at20[gas]).toBeCloseTo(at15[gas] * 20 / 15, 6);
+        expect(() => calculateGasRequirements(dive, res, null, 0)).toThrow(/SAC rate/);
+    });
+
+    it('reports open-circuit limits of the diluent as bailout warnings', () => {
+        const dive = { depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, is_ccr: true, setpoint: 1.3 };
+        const warnings = planBailout(dive).warnings;
+        expect(warnings).toContain('Bailout: Bottom gas density too high: 7.7 g/L');
+        expect(warnings.every(w => w.startsWith('Bailout: '))).toBe(true);
+        // The loop's own checks stay with the loop plan, not repeated here.
+        expect(warnings.some(w => /setpoint/i.test(w))).toBe(false);
+    });
+
+    it('refuses to plan a bailout for an open-circuit dive', () => {
+        expect(() => planBailout({ depth: 40, bottom_time: 20, bottom_gas: 'Air' })).toThrow(/CCR dives only/);
     });
 });

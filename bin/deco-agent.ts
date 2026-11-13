@@ -4,7 +4,9 @@ import chalk from 'chalk';
 import { readFileSync } from 'node:fs';
 import { 
     planDive, 
-    calculateGasConsumption, 
+    planBailout,
+    calculateGasRequirements,
+    GAS_RESERVE_FACTOR,
     GASES, 
     PLAN_DEFAULTS,
     calculateMod, 
@@ -87,7 +89,7 @@ program
     const decoGases = ["Oxygen", "Tx 50/15", "Tx 35/35", "Tx 24/35", "Tx 17/70"];
     
     try {
-        const result = planDive({
+        const request = {
             depth: options.depth,
             bottom_time: options.time,
             bottom_gas: options.gas,
@@ -102,28 +104,27 @@ program
             ascent_rate: options.ascRate,
             force_6m: options.force6m !== false,
             model: options.model,
-        });
-
-        const gasReqs = calculateGasConsumption(
-            result.schedule,
-            options.depth,
-            options.time,
-            options.gas,
-            15.0, // SAC
-            isCcr,
-            1.0,  // O2 cons
-            options.descRate,
-            options.ascRate
-        );
+        };
+        const result = planDive(request);
+        const bailout = isCcr ? planBailout(request) : null;
+        const gasReqs = calculateGasRequirements(request, result, bailout);
+        const scheduleHeader = () => {
+            console.log(`${chalk.bold('Depth'.padStart(5))} | ${chalk.bold('RT'.padStart(7))} | ${chalk.bold('Time'.padStart(5))} | ${chalk.bold('Gas'.padEnd(12))} | ${chalk.bold('CNS%'.padStart(6))} | ${chalk.bold('OTU'.padStart(6))}`);
+            console.log(chalk.gray(''.padEnd(65, '-')));
+        };
+        const scheduleRow = (s: typeof result.schedule[number]) =>
+            console.log(`${s.depth.toFixed(0).padStart(4)}m | ${s.run_time.toFixed(1).padStart(5)}min | ${s.time.toFixed(0).padStart(4)}min | ${s.gas.padEnd(12)} | ${s.cns.toFixed(1).padStart(5)}% | ${s.otu.toFixed(1).padStart(6)}`);
 
         console.log(chalk.bold(`\nDeco Schedule (${isCcr ? 'CCR' : 'OC'} | Model: ZH-L16${options.model.toUpperCase()} | GF: ${options.gfLow}/${options.gfHigh}):`));
         console.log(chalk.gray(`Rates: Descent ${options.descRate}m/min, Ascent ${options.ascRate}m/min`));
-        console.log(`${chalk.bold('Depth'.padStart(5))} | ${chalk.bold('RT'.padStart(7))} | ${chalk.bold('Time'.padStart(5))} | ${chalk.bold('Gas'.padEnd(12))} | ${chalk.bold('CNS%'.padStart(6))} | ${chalk.bold('OTU'.padStart(6))}`);
-        console.log(chalk.gray(''.padEnd(65, '-')));
+        scheduleHeader();
+        result.schedule.forEach(scheduleRow);
 
-        result.schedule.forEach(s => {
-            console.log(`${s.depth.toFixed(0).padStart(4)}m | ${s.run_time.toFixed(1).padStart(5)}min | ${s.time.toFixed(0).padStart(4)}min | ${s.gas.padEnd(12)} | ${s.cns.toFixed(1).padStart(5)}% | ${s.otu.toFixed(1).padStart(6)}`);
-        });
+        if (bailout) {
+            console.log(chalk.bold('\nBailout Schedule (open circuit from the end of bottom time):'));
+            scheduleHeader();
+            bailout.schedule.forEach(scheduleRow);
+        }
 
         if (isCcr) {
             console.log(chalk.bold('\nOnboard Gas Requirements (Minimum for Dive):'));
@@ -132,8 +133,11 @@ program
             });
         }
 
-        console.log(chalk.bold('\nBailout Gas Requirements (OC descent + deco, 1.5x Safety):'));
-        Object.entries(gasReqs.bailout).forEach(([gas, vol]) => {
+        const reserve = `${GAS_RESERVE_FACTOR}x reserve, SAC 15 L/min`;
+        console.log(chalk.bold(isCcr
+            ? `\nBailout Gas Requirements (OC ascent from the end of bottom time, ${reserve}):`
+            : `\nGas Requirements (${reserve}):`));
+        Object.entries(gasReqs.open_circuit).forEach(([gas, vol]) => {
             console.log(`  ${gas.padEnd(15)}: ${vol.toFixed(0).padStart(5)} L`);
         });
 
@@ -144,9 +148,10 @@ program
         console.log(chalk.bold('\nSurface Pressure Load:'));
         console.log(`  Surface GF: ${result.surface_gf.toFixed(1).padStart(6)} %`);
 
-        if (result.warnings.length > 0) {
+        const warnings = [...result.warnings, ...(bailout?.warnings ?? [])];
+        if (warnings.length > 0) {
             console.log(chalk.bold.red('\nSafety Warnings:'));
-            result.warnings.forEach(w => console.log(chalk.red(`  !!! ${w} !!!`)));
+            warnings.forEach(w => console.log(chalk.red(`  !!! ${w} !!!`)));
         }
 
     } catch (err: any) {

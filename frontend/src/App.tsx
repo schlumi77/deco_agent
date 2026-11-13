@@ -4,7 +4,7 @@ import DiveForm from './components/DiveForm';
 import InfoModal from './components/InfoModal';
 import type { DivePlanResponse, DivePlanRequest } from '@shared/types';
 import { Activity, AlertTriangle, Settings, ChevronUp, Info } from 'lucide-react';
-import { planDive, calculateGasConsumption } from '@shared/engine/planner';
+import { planDive, planBailout, calculateGasRequirements, GAS_RESERVE_FACTOR } from '@shared/engine/planner';
 
 // The charts pull in Recharts, the bulk of the bundle. Loading them on demand
 // keeps the form and the schedule table out of that download.
@@ -16,6 +16,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [model, setModel] = useState('C');
+  const [isCcr, setIsCcr] = useState(false);
   const [showMobileParams, setShowMobileParams] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
@@ -27,22 +28,13 @@ function App() {
     setTimeout(() => {
       try {
         const result = planDive(request);
+        const bailout = request.is_ccr ? planBailout(request) : null;
 
-        const gasReqs = calculateGasConsumption(
-          result.schedule,
-          request.depth,
-          request.bottom_time,
-          request.bottom_gas,
-          15.0, // default SAC
-          request.is_ccr,
-          1.0, // default O2 cons
-          request.descent_rate,
-          request.ascent_rate
-        );
-
+        setIsCcr(request.is_ccr);
         setPlan({
           ...result,
-          gas_requirements: gasReqs
+          warnings: [...result.warnings, ...(bailout?.warnings ?? [])],
+          gas_requirements: calculateGasRequirements(request, result, bailout),
         });
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -175,8 +167,8 @@ function App() {
                     </div>
                   )}
                   <div className="gas-group">
-                    <div className="gas-group-label">BAILOUT (1.5x)</div>
-                    {Object.entries(plan.gas_requirements.bailout).map(([gas, vol]) => (
+                    <div className="gas-group-label">{isCcr ? 'BAILOUT' : 'OPEN CIRCUIT'} ({GAS_RESERVE_FACTOR}x)</div>
+                    {Object.entries(plan.gas_requirements.open_circuit).map(([gas, vol]) => (
                       <div key={gas} className="gas-row">
                         <span>{gas}</span>
                         <span className="vol">{Math.round(vol as number)}L</span>
