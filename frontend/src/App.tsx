@@ -38,6 +38,8 @@ function App() {
           gas_requirements: gasRequirements,
         });
       } catch (err: unknown) {
+        // The last plan no longer matches the inputs, so stop showing it.
+        setPlan(null);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
         setLoading(false);

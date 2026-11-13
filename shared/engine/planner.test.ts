@@ -288,8 +288,14 @@ describe('Request defaults', () => {
         expect(PLAN_DEFAULTS).toMatchObject({ gf_low: 50, gf_high: 80, model: 'C', force_6m: true });
     });
 
-    it('plans without deco gases when none are given', () => {
+    it('uses the default deco gases when none are given', () => {
+        expect(PLAN_DEFAULTS.deco_gases).toEqual(['Tx 50/15', 'Oxygen']);
         const res = planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air' });
+        expect(Object.keys(res.gas_usage)).toEqual(['Air', 'Tx 50/15', 'Oxygen']);
+    });
+
+    it('plans on the bottom gas alone when given an empty deco list', () => {
+        const res = planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air', deco_gases: [] });
         expect(res.schedule.every(s => s.gas === 'Air')).toBe(true);
     });
 
@@ -456,5 +462,50 @@ describe('Cylinder checks', () => {
         expect(() => calculateGasRequirements({ ...CCR_DIVE, o2_consumption: 0 }, planDive(CCR_DIVE))).toThrow(/Oxygen consumption/);
         // Oxygen consumption only matters on the loop.
         expect(() => calculateGasRequirements({ ...OC_DIVE, o2_consumption: 0 }, res)).not.toThrow();
+    });
+});
+
+describe('Deco gas selection', () => {
+    // Regression: the planner switched to the richest listed gas within pO2
+    // 1.6 without comparing it with the bottom gas. Bailing out from 60 m on a
+    // Tx 18/45 diluent, it switched to Tx 17/70: less oxygen and more inert gas.
+
+    const usedGases = (res: DivePlanResponse) => Object.keys(res.gas_usage);
+
+    it('never switches to a gas with less oxygen than the bottom gas', () => {
+        const dive = { depth: 60, bottom_time: 25, bottom_gas: 'Tx 18/45', deco_gases: ['Tx 17/70', 'Tx 50/15', 'Oxygen'] };
+        const res = planDive(dive);
+        expect(usedGases(res)).toEqual(['Tx 18/45', 'Tx 50/15', 'Oxygen']);
+        expect(res.schedule.some(s => s.gas.includes('17/70'))).toBe(false);
+        expect(res.warnings).toContain('Deco gas Tx 17/70 not used: it carries no more oxygen than the bottom gas Tx 18/45');
+    });
+
+    it('plans exactly as if a skipped gas had not been listed', () => {
+        const withLean = planDive({ depth: 60, bottom_time: 25, bottom_gas: 'Tx 18/45', deco_gases: ['Tx 17/70', 'Tx 50/15', 'Oxygen'] });
+        const without = planDive({ depth: 60, bottom_time: 25, bottom_gas: 'Tx 18/45', deco_gases: ['Tx 50/15', 'Oxygen'] });
+        expect(withLean.schedule).toEqual(without.schedule);
+        expect(withLean.gas_usage).toEqual(without.gas_usage);
+    });
+
+    it('skips a deco gas that matches the bottom gas', () => {
+        const res = planDive({ depth: 40, bottom_time: 20, bottom_gas: 'Air', deco_gases: ['Air', 'Oxygen'] });
+        expect(res.warnings).toContain('Deco gas Air not used: it carries no more oxygen than the bottom gas Air');
+    });
+
+    it('applies the same rule on bailout, reporting skipped gases only once', () => {
+        const dive = { depth: 60, bottom_time: 25, bottom_gas: 'Tx 18/45', deco_gases: ['Tx 17/70', 'Tx 50/15', 'Oxygen'], is_ccr: true, setpoint: 1.3 };
+        const bailout = planBailout(dive);
+        expect(usedGases(bailout)).toEqual(['Tx 18/45', 'Tx 50/15', 'Oxygen']);
+        // The CCR plan reports it; the bailout plan does not repeat it.
+        expect(planDive(dive).warnings.some(w => w.includes('Tx 17/70'))).toBe(true);
+        expect(bailout.warnings.some(w => w.includes('Tx 17/70'))).toBe(false);
+    });
+
+    it('still uses a richer listed gas as soon as it is within its MOD', () => {
+        // Tx 24/35 carries more oxygen than air and is within pO2 1.6 at 50 m,
+        // so a diver who lists it switches to it when leaving the bottom.
+        const res = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: ['Tx 24/35', 'Tx 50/15', 'Oxygen'] });
+        expect(usedGases(res)).toEqual(['Air', 'Tx 24/35', 'Tx 50/15', 'Oxygen']);
+        expect(res.warnings.some(w => w.startsWith('Deco gas'))).toBe(false);
     });
 });

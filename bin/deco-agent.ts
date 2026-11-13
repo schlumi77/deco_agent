@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { Command, InvalidArgumentError } from 'commander';
+import { Command, InvalidArgumentError, Option } from 'commander';
 import chalk from 'chalk';
 import { readFileSync } from 'node:fs';
 import { 
@@ -19,6 +19,14 @@ function parseNumber(value: string): number {
     const n = Number(value);
     if (value.trim() === '' || !Number.isFinite(n)) throw new InvalidArgumentError('Not a number.');
     return n;
+}
+
+// Deco gases as a comma-separated list of names, or "none".
+function parseGasList(value: string): string[] {
+    if (value.trim().toLowerCase() === 'none') return [];
+    const names = value.split(',').map(n => n.trim()).filter(n => n !== '');
+    if (names.length === 0) throw new InvalidArgumentError('List gas names separated by commas, or "none".');
+    return names;
 }
 
 // A cylinder as <litres>@<bar>, e.g. 11.1@207.
@@ -85,6 +93,9 @@ program
   .requiredOption('-t, --time <number>', 'Bottom time in minutes', parseNumber)
   .option('-g, --gas <string>', 'Bottom gas/diluent name', 'Tx 6/90')
   .option('-m, --mode <string>', 'Dive mode (ccr/oc)', parseChoice(['ccr', 'oc']), 'ccr')
+  .addOption(new Option('--deco <gases>', 'Deco gases carried, comma-separated (e.g. "Tx 50/15,Oxygen"), or "none"')
+    .argParser(parseGasList)
+    .default(PLAN_DEFAULTS.deco_gases, PLAN_DEFAULTS.deco_gases.join(',')))
   .option('--gf-low <number>', 'Gradient Factor Low %', parseNumber, PLAN_DEFAULTS.gf_low)
   .option('--gf-high <number>', 'Gradient Factor High %', parseNumber, PLAN_DEFAULTS.gf_high)
   .option('--setpoint <number>', 'CCR Bottom Setpoint', parseNumber, PLAN_DEFAULTS.setpoint)
@@ -101,14 +112,13 @@ program
   .option('--o2-cyl <litres@bar>', `CCR onboard ${CYLINDERS.oxygen.name.toLowerCase()} cylinder (default: ${cylinderDefault(CYLINDERS.oxygen)})`, parseCylinder)
   .action((options) => {
     const isCcr = options.mode === 'ccr';
-    const decoGases = ["Oxygen", "Tx 50/15", "Tx 35/35", "Tx 24/35", "Tx 17/70"];
     
     try {
         const request = {
             depth: options.depth,
             bottom_time: options.time,
             bottom_gas: options.gas,
-            deco_gases: decoGases,
+            deco_gases: options.deco,
             gf_low: options.gfLow,
             gf_high: options.gfHigh,
             is_ccr: isCcr,
