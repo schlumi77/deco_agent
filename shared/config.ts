@@ -30,7 +30,7 @@ export const CYLINDERS: Record<keyof CylinderKit, { name: string } & Cylinder> =
 // Defaults shared by the engine, the CLI and the web form, so the same dive
 // gives the same plan wherever it is entered. Gradient factors are percentages.
 export const PLAN_DEFAULTS = {
-    deco_gases: [] as string[],
+    deco_gases: ['Tx 50/15', 'Oxygen'],
     gf_low: 50,
     gf_high: 80,
     is_ccr: false,

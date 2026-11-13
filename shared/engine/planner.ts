@@ -63,6 +63,8 @@ class DivePlanner {
     private currentGasName: string;
     private diluent: Gas;
     private decoCandidates: Gas[];
+    // Listed deco gases left out because they carry no more oxygen than the bottom gas.
+    private skippedDecoGases: string[];
     private effectiveDecoSetpoint: number;
     private effectiveDecoGasSetpoint: number;
 
@@ -137,13 +139,20 @@ class DivePlanner {
         if (!dil) throw new Error(`Unknown bottom gas "${bottomGasName}"`);
         this.diluent = dil;
 
-        this.decoCandidates = decoGasNames
-            .map(name => {
-                const gas = gasesMap.get(name);
-                if (!gas) throw new Error(`Unknown deco gas "${name}"`);
-                return gas;
-            })
+        const listedDecoGases = decoGasNames.map(name => {
+            const gas = gasesMap.get(name);
+            if (!gas) throw new Error(`Unknown deco gas "${name}"`);
+            return gas;
+        });
+        // Switching only helps if the deco gas carries more oxygen than the
+        // bottom gas. A leaner one, such as a travel mix, would load the diver
+        // with more inert gas on the ascent, so it is left out and reported.
+        this.decoCandidates = listedDecoGases
+            .filter(g => g.fO2 > dil.fO2)
             .sort((a, b) => b.fO2 - a.fO2);
+        this.skippedDecoGases = listedDecoGases
+            .filter(g => g.fO2 <= dil.fO2)
+            .map(g => g.name);
 
         this.currentGasName = this.getGasStable(this.diluent, isCcr ? setpoint : null);
     }
@@ -168,6 +177,9 @@ class DivePlanner {
     }
 
     private runInitialChecks() {
+        for (const name of this.skippedDecoGases) {
+            this.warnings.push(`Deco gas ${name} not used: it carries no more oxygen than the bottom gas ${this.diluent.name}`);
+        }
         if (this.isCcr) {
             if (this.setpoint > 1.4) this.warnings.push(`Bottom setpoint pO2 too high: ${this.setpoint.toFixed(2)} bar`);
             if (this.effectiveDecoSetpoint > 1.4) this.warnings.push(`Deco setpoint pO2 too high: ${this.effectiveDecoSetpoint.toFixed(2)} bar`);
