@@ -127,7 +127,8 @@ and on every pull request, in two independent jobs:
 
 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) publishes the built
 frontend to GitHub Pages on pushes to `main` that touch `frontend/**`, `shared/**`,
-or the workflow itself.
+the root `package.json` (which carries the version shown in the app), or the workflow
+itself.
 
 ---
 
