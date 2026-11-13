@@ -1,4 +1,4 @@
-# 🤿 Deco_agent v3.0
+# 🤿 Deco_agent
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
