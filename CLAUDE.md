@@ -46,6 +46,13 @@ npm run test -- run
 `npm run test` alone starts Vitest in watch mode. Always append `run` for a
 single non-interactive pass — this is what CI executes.
 
+### Compare with a Reference Planner
+```bash
+npm run reference
+```
+
+Prints the reference dives in `shared/engine/reference/` with this planner's result. Once external results (Subsurface, MultiDeco) are pasted into `dives.ts`, `npm run test -- run` fails when a plan drifts outside tolerance. See `shared/engine/reference/README.md` for the settings to match.
+
 ### Typecheck and Lint
 ```bash
 npm run typecheck              # bin/ and shared/, strict
@@ -98,6 +105,7 @@ This updates `package.json` and `package-lock.json` together; commit both. Leave
 - `shared/engine/deco_engine.ts`: Physiological core (ZHL-16B/C, CNS, OTU).
 - `shared/engine/planner.ts`: Planning orchestrator (`planDive`), CCR bailout re-plan (`planBailout`) and gas requirements checked against the cylinder kit (`calculateGasRequirements`). Every tissue update goes through `DivePlanner.breathe()`, which also records open-circuit gas use; keep it that way so gas accounting matches the model.
 - `shared/engine/*.test.ts`: Vitest suites for the engine and planner.
+- `shared/engine/reference/`: Reference dives compared with an external planner (`dives.ts`), the comparison and tolerances (`compare.ts`), `npm run reference` (`report.ts`) and the settings to match (`README.md`). A failing reference dive means a defect or an unshared convention; find out which before widening a tolerance.
 - `shared/config.ts`: `GASES` (standard diving gas database), `CYLINDERS` (the default kit: bottom or diluent/bailout, stage, CCR onboard oxygen) and `PLAN_DEFAULTS`.
 - `shared/types.ts`: Shared interfaces for CLI and Frontend.
 
