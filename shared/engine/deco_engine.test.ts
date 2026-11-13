@@ -3,6 +3,7 @@ import {
     DecoEngine,
     OxygenToxicityTracker,
     SURFACE_PRESSURE,
+    GAS_LIMIT_SURFACE_PRESSURE,
     WATER_VAPOR_PRESSURE,
     calculateGasDensity,
 } from './deco_engine.js';
@@ -100,16 +101,18 @@ describe('Ceiling behaviour', () => {
     });
 });
 
-describe('Gas-limit physics (sea-level surface pressure)', () => {
-    it('MOD uses the shared surface pressure', () => {
-        // (1.4 / 0.21 - 1.013) * 10
-        expect(calculateMod(0.21, 1.4)).toBeCloseTo(56.537, 2);
-        expect(calculateMod(1.0, 1.6)).toBeCloseTo(5.87, 2);
+describe('Gas limits and gas physics', () => {
+    it('MOD follows the conventional 1 bar surface', () => {
+        // (1.4 / 0.21 - 1) * 10
+        expect(GAS_LIMIT_SURFACE_PRESSURE).toBe(1.0);
+        expect(calculateMod(0.21, 1.4)).toBeCloseTo(56.667, 2);
+        expect(calculateMod(1.0, 1.6)).toBeCloseTo(6.0, 6);
+        expect(calculateMod(0.5, 1.6)).toBeCloseTo(22.0, 6);
     });
 
     it('MinOD marks the hypoxic floor for a lean mix', () => {
-        // Tx 10/80 at default 0.16 hypoxic limit: (0.16/0.10 - 1.013) * 10
-        expect(calculateMinOd(0.10)).toBeCloseTo(5.87, 2);
+        // Tx 10/80 at default 0.16 hypoxic limit: (0.16/0.10 - 1) * 10
+        expect(calculateMinOd(0.10)).toBeCloseTo(6.0, 6);
     });
 
     it('END equals depth for a helium-free gas', () => {

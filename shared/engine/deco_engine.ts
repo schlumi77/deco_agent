@@ -41,11 +41,17 @@ export const ZHL16C_COMPARTMENTS: number[][] = [
 
 export const WATER_VAPOR_PRESSURE = 0.0627; // bar @ 37C
 
-// Atmospheric pressure at sea level (bar). Single source of truth for the
-// surface pressure used throughout the engine and planner so that the tissue
-// model, breathing-gas mixes, and gas-limit calculations all agree. Depth is
-// converted at 10 msw = 1 bar, so absolute pressure = SURFACE_PRESSURE + depth/10.
+// Atmospheric pressure at sea level (bar), used wherever the physics needs the
+// real ambient pressure: tissue loading, CNS/OTU, CCR loop mixes, END, gas
+// density and gas consumption. Depth is converted at 10 msw = 1 bar, so
+// absolute pressure = SURFACE_PRESSURE + depth/10.
 export const SURFACE_PRESSURE = 1.013;
+
+// Surface pressure assumed by gas limits: MOD, MinOD, the deco gas switch and
+// the bottom-gas pO2 warning. Dive training, tables and planners use 1 bar, so
+// MOD = (pO2 / fO2 - 1) x 10 and oxygen is used at 6 m at pO2 1.6. The real
+// pO2 there is 1.613 bar, which is what CNS/OTU are computed from.
+export const GAS_LIMIT_SURFACE_PRESSURE = 1.0;
 
 export class OxygenToxicityTracker {
     NOAA_LIMITS = [
