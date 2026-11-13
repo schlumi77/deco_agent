@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { DivePlanRequest } from '@shared/types';
+import type { DivePlanRequest, Cylinder, CylinderKit } from '@shared/types';
 import { GASES, PLAN_DEFAULTS, type Gas } from '@shared/engine/planner';
 
 interface Props {
@@ -43,6 +43,25 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
     
     setRequest((prev: DivePlanRequest) => ({ ...prev, [name]: val }));
   };
+
+  const handleCylinderChange = (role: keyof CylinderKit, field: keyof Cylinder) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+      setRequest((prev: DivePlanRequest) => ({
+        ...prev,
+        cylinders: { ...prev.cylinders, [role]: { ...prev.cylinders[role], [field]: value } },
+      }));
+    };
+
+  const cylinderField = (role: keyof CylinderKit, label: string) => (
+    <div className="form-group-inline">
+      <label>{label}</label>
+      <input type="number" inputMode="decimal" step="0.1" value={request.cylinders[role].volume} onChange={handleCylinderChange(role, 'volume')} aria-label={`${label} volume`} />
+      <span className="unit-label">L</span>
+      <input type="number" inputMode="numeric" step="10" value={request.cylinders[role].pressure} onChange={handleCylinderChange(role, 'pressure')} aria-label={`${label} pressure`} />
+      <span className="unit-label">bar</span>
+    </div>
+  );
 
   const handleDecoGasToggle = (name: string) => {
     setRequest((prev: DivePlanRequest) => {
@@ -175,6 +194,26 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="toolbar-separator" />
+
+      <div className="toolbar-section">
+        <div className="form-group-inline">
+          <label>SAC</label>
+          <input type="number" inputMode="decimal" name="sac_rate" step="1" value={request.sac_rate} onChange={handleChange} />
+          <span className="unit-label">L/min</span>
+        </div>
+        {request.is_ccr && (
+          <div className="form-group-inline">
+            <label>O2 USE</label>
+            <input type="number" inputMode="decimal" name="o2_consumption" step="0.1" value={request.o2_consumption} onChange={handleChange} />
+            <span className="unit-label">L/min</span>
+          </div>
+        )}
+        {cylinderField('bottom', request.is_ccr ? 'DIL/BAILOUT' : 'BOTTOM CYL')}
+        {request.deco_gases.length > 0 && cylinderField('stage', 'STAGE CYL')}
+        {request.is_ccr && cylinderField('oxygen', 'O2 CYL')}
       </div>
     </div>
   );

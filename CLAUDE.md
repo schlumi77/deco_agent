@@ -12,7 +12,7 @@ The project has been refactored from a Python/TypeScript hybrid into a **unified
 -   **Engine (`shared/engine/`)**: Single source of truth for ZHL-16B/C math and planning logic.
 -   **CLI (`bin/deco-agent.ts`)**: Node.js command-line interface for planning and gas info.
 -   **Web App (`frontend/`)**: React/Vite dashboard using the same shared engine (Offline-capable).
--   **Data (`shared/config.ts`)**: Shared `GASES` and `CYLINDERS` definitions.
+-   **Data (`shared/config.ts`)**: Shared `GASES`, the default cylinder kit (`CYLINDERS`) and `PLAN_DEFAULTS`.
 -   **CI (`.github/workflows/`)**: `ci.yml` runs engine tests and the frontend build on
     every push to `main` and every PR; `deploy.yml` publishes the frontend to GitHub Pages.
 
@@ -63,7 +63,7 @@ Requires Node.js 20 or higher.
 5.  **Keep CI Green**: Any engine or CLI change must pass `npm run typecheck` and `npm run test -- run`, and any frontend change must pass `npm run lint` and `npm run build` in `frontend/`. CI runs all four on every PR.
 6.  **Single Version Source**: The app version comes from the root `package.json`: the web app reads it via the `__APP_VERSION__` define in `frontend/vite.config.ts`, the CLI reads the file at startup. Do not hardcode version strings.
 7.  **Single Agent Instructions File**: `CLAUDE.md` is the only agent instructions file for this repo. Keep it current when structure or conventions change, and do not add parallel files such as `GEMINI.md` or `AGENTS.md`.
-8.  **Single Defaults Source**: Plan defaults (GFs, setpoints, rates, model, 6 m floor) live in `PLAN_DEFAULTS` in `shared/config.ts`. The engine, CLI and web form all read them from there; do not restate default values elsewhere.
+8.  **Single Defaults Source**: Plan defaults (GFs, setpoints, rates, model, 6 m floor, SAC, CCR oxygen use, cylinder sizes) live in `PLAN_DEFAULTS` in `shared/config.ts`. The engine, CLI and web form all read them from there; do not restate default values elsewhere.
 9.  **Version Every PR**: Every PR bumps the version in the root `package.json` following Semantic Versioning. See [Versioning](#versioning) for which level to pick and how.
 
 ## Versioning
@@ -96,9 +96,9 @@ This updates `package.json` and `package-lock.json` together; commit both. Leave
 
 **Engine & data (shared):**
 - `shared/engine/deco_engine.ts`: Physiological core (ZHL-16B/C, CNS, OTU).
-- `shared/engine/planner.ts`: Planning orchestrator (`planDive`), CCR bailout re-plan (`planBailout`) and gas requirements (`calculateGasRequirements`). Every tissue update goes through `DivePlanner.breathe()`, which also records open-circuit gas use; keep it that way so gas accounting matches the model.
+- `shared/engine/planner.ts`: Planning orchestrator (`planDive`), CCR bailout re-plan (`planBailout`) and gas requirements checked against the cylinder kit (`calculateGasRequirements`). Every tissue update goes through `DivePlanner.breathe()`, which also records open-circuit gas use; keep it that way so gas accounting matches the model.
 - `shared/engine/*.test.ts`: Vitest suites for the engine and planner.
-- `shared/config.ts`: `GASES` (standard diving gas database), `CYLINDERS` and `PLAN_DEFAULTS`.
+- `shared/config.ts`: `GASES` (standard diving gas database), `CYLINDERS` (the default kit: bottom or diluent/bailout, stage, CCR onboard oxygen) and `PLAN_DEFAULTS`.
 - `shared/types.ts`: Shared interfaces for CLI and Frontend.
 
 **Entry points:**

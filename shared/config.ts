@@ -1,12 +1,4 @@
-import type { Gas } from './types.js';
-
-export interface Cylinder {
-    name: string;
-    volume: number;
-    pressure: number;
-    gas: string;
-    role: string;
-}
+import type { Gas, Cylinder, CylinderKit } from './types.js';
 
 export const GASES: Gas[] = [
     {"name": "Air", "fO2": 0.21, "fHe": 0.00, "type": "bottom"},
@@ -24,12 +16,16 @@ export const GASES: Gas[] = [
     {"name": "Tx 6/90", "fO2": 0.06, "fHe": 0.90, "type": "bottom"}
 ];
 
-export const CYLINDERS: Cylinder[] = [
-    {"name": "Oxygen", "volume": 3.0, "pressure": 200, "gas": "Oxygen", "role": "deco"},
-    {"name": "Diluent/Bailout", "volume": 16.5, "pressure": 200, "gas": "Standard Tx", "role": "bottom"},
-    {"name": "Inflation", "volume": 3.0, "pressure": 200, "gas": "Air", "role": "suit"},
-    {"name": "Stage", "volume": 5.4, "pressure": 200, "gas": "Deco Tx", "role": "stage"}
-];
+// The default cylinder kit, named for display. See CylinderKit in types.ts for
+// what each cylinder supplies. Volumes are water capacity in litres, pressures
+// fill pressure in bar.
+// The bottom cylinder is named for CCR dives; OC dives call it OC_BOTTOM_CYLINDER_NAME.
+export const OC_BOTTOM_CYLINDER_NAME = "Bottom";
+export const CYLINDERS: Record<keyof CylinderKit, { name: string } & Cylinder> = {
+    bottom: { name: "Diluent/Bailout", volume: 16.5, pressure: 200 },
+    stage: { name: "Stage", volume: 5.4, pressure: 200 },
+    oxygen: { name: "Oxygen", volume: 3.0, pressure: 200 },
+};
 
 // Defaults shared by the engine, the CLI and the web form, so the same dive
 // gives the same plan wherever it is entered. Gradient factors are percentages.
@@ -44,4 +40,11 @@ export const PLAN_DEFAULTS = {
     ascent_rate: 10,
     force_6m: true,
     model: 'C',
+    sac_rate: 15,
+    o2_consumption: 1.0,
+    cylinders: {
+        bottom: { volume: CYLINDERS.bottom.volume, pressure: CYLINDERS.bottom.pressure },
+        stage: { volume: CYLINDERS.stage.volume, pressure: CYLINDERS.stage.pressure },
+        oxygen: { volume: CYLINDERS.oxygen.volume, pressure: CYLINDERS.oxygen.pressure },
+    } as CylinderKit,
 };
