@@ -6,8 +6,11 @@ import {
     GAS_RESERVE_FACTOR,
     PLAN_DEFAULTS,
     CYLINDERS,
+    GASES,
+    calculateMod,
+    gasLimitPo2,
 } from './planner.js';
-import { SURFACE_PRESSURE } from './deco_engine.js';
+import { SURFACE_PRESSURE, DecoEngine } from './deco_engine.js';
 import type { DivePlanResponse } from '../types.js';
 
 const DECO_GASES = ['Oxygen', 'Tx 50/15'];
@@ -507,5 +510,39 @@ describe('Deco gas selection', () => {
         const res = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: ['Tx 24/35', 'Tx 50/15', 'Oxygen'] });
         expect(usedGases(res)).toEqual(['Air', 'Tx 24/35', 'Tx 50/15', 'Oxygen']);
         expect(res.warnings.some(w => w.startsWith('Deco gas'))).toBe(false);
+    });
+});
+
+describe('Gas limit convention', () => {
+    // Regression: the gas switch assumed a 1 bar surface while calculateMod()
+    // and the `gases` table used 1.013 bar, so oxygen was used at 6 m while
+    // its MOD was listed as 5.9 m. All gas limits now share one convention.
+
+    it('switches to a deco gas exactly down to the MOD the gases table shows', () => {
+        for (const gas of GASES.filter(g => g.type === 'deco')) {
+            const mod = calculateMod(gas.fO2, 1.6);
+            for (let depth = 0; depth <= 100; depth++) {
+                const switchable = gasLimitPo2(gas.fO2, depth) <= 1.6;
+                expect(switchable, `${gas.name} at ${depth} m`).toBe(depth <= mod + 1e-9);
+            }
+        }
+    });
+
+    it('uses oxygen at a 6 m stop', () => {
+        const res = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air' });
+        expect(res.schedule.find(s => s.depth === 6)?.gas).toBe('Oxygen');
+        expect(calculateMod(1.0, 1.6)).toBeCloseTo(6, 9);
+    });
+
+    it('computes oxygen toxicity from the real ambient pressure', () => {
+        // Oxygen at 6 m is pO2 1.6 by the gas-limit convention, but the diver
+        // really breathes 1.613 bar. OTUs scale continuously with pO2, so they
+        // show which one the engine uses.
+        const engine = new DecoEngine(SURFACE_PRESSURE, 'C');
+        engine.updateTissues(6, 6, 1, 1.0, 0.0);
+        const realPo2 = SURFACE_PRESSURE + 0.6;
+        expect(gasLimitPo2(1.0, 6)).toBeCloseTo(1.6, 9);
+        expect(engine.toxicity_tracker.otus).toBeCloseTo(Math.pow((realPo2 - 0.5) / 0.5, 0.833), 9);
+        expect(engine.toxicity_tracker.otus).toBeGreaterThan(Math.pow((1.6 - 0.5) / 0.5, 0.833));
     });
 });

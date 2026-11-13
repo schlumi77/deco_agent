@@ -1,15 +1,21 @@
-import { DecoEngine, calculateGasDensity, SURFACE_PRESSURE, WATER_VAPOR_PRESSURE } from './deco_engine.js';
+import { DecoEngine, calculateGasDensity, SURFACE_PRESSURE, GAS_LIMIT_SURFACE_PRESSURE, WATER_VAPOR_PRESSURE } from './deco_engine.js';
 import type { ScheduleEntry, Gas, ProfileEntry, DivePlanResponse, DivePlanRequest, DivePlanInput, GasRequirements, CylinderCheck, CylinderKit } from '../types.js';
 export type { Gas, DivePlanInput };
 import { GASES, PLAN_DEFAULTS, CYLINDERS, OC_BOTTOM_CYLINDER_NAME } from '../config.js';
 export { GASES, PLAN_DEFAULTS, CYLINDERS, OC_BOTTOM_CYLINDER_NAME };
 
-export function calculateMod(fo2: number, maxPo2: number, surfacePressure = SURFACE_PRESSURE): number {
+// pO2 of a gas at a depth, by the gas-limit convention (see GAS_LIMIT_SURFACE_PRESSURE).
+// Every gas limit goes through this or calculateMod/calculateMinOd so they agree.
+export function gasLimitPo2(fo2: number, depth: number): number {
+    return (GAS_LIMIT_SURFACE_PRESSURE + depth / 10) * fo2;
+}
+
+export function calculateMod(fo2: number, maxPo2: number, surfacePressure = GAS_LIMIT_SURFACE_PRESSURE): number {
     if (fo2 <= 0) return Infinity;
     return (maxPo2 / fo2 - surfacePressure) * 10;
 }
 
-export function calculateMinOd(fo2: number, minPo2 = 0.16, surfacePressure = SURFACE_PRESSURE): number {
+export function calculateMinOd(fo2: number, minPo2 = 0.16, surfacePressure = GAS_LIMIT_SURFACE_PRESSURE): number {
     if (fo2 <= 0) return Infinity;
     const depth = (minPo2 / fo2 - surfacePressure) * 10;
     return Math.max(0, depth);
@@ -203,7 +209,7 @@ class DivePlanner {
         if (density > 6.2) this.warnings.push(`Bottom gas density too high: ${density.toFixed(1)} g/L`);
         const end = calculateEnd(this.depth, this.diluent.fHe);
         if (end > 30) this.warnings.push(`Bottom gas END too deep: ${end.toFixed(0)}m`);
-        const po2 = (this.surfacePressure + this.depth / 10.0) * this.diluent.fO2;
+        const po2 = gasLimitPo2(this.diluent.fO2, this.depth);
         if (po2 > 1.4) this.warnings.push(`Bottom gas pO2 too high: ${po2.toFixed(2)} bar`);
     }
 
@@ -243,7 +249,7 @@ class DivePlanner {
 
     private getBestGas(d: number): { gas: Gas; setpoint: number | null } {
         for (const g of this.decoCandidates) {
-            if ((d / 10 + 1) * g.fO2 <= 1.6) {
+            if (gasLimitPo2(g.fO2, d) <= 1.6) {
                 return { 
                     gas: g, 
                     setpoint: this.isCcr ? this.effectiveDecoGasSetpoint : null 
