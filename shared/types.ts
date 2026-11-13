@@ -28,8 +28,11 @@ export interface TissueLoad {
     load_percent: number;
 }
 
+// Litres of gas to carry, including the reserve factor. `open_circuit` is the
+// dive's own gas on an OC dive and the bailout gas on a CCR dive; `onboard`
+// (oxygen and diluent cylinders) is filled only for CCR dives.
 export interface GasRequirements {
-    bailout: Record<string, number>;
+    open_circuit: Record<string, number>;
     onboard: Record<string, number>;
 }
 
@@ -41,6 +44,9 @@ export interface DivePlanResponse {
     warnings: string[];
     cns_percent: number;
     otus: number;
+    // Open-circuit breathing per gas, as ambient pressure x time (bar.min).
+    // Multiply by a SAC rate in L/min for litres. Empty while on the loop.
+    gas_usage: Record<string, number>;
     gas_requirements?: GasRequirements;
 }
 

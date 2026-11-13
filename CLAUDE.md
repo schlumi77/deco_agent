@@ -69,7 +69,7 @@ Requires Node.js 20 or higher.
 
 **Engine & data (shared):**
 - `shared/engine/deco_engine.ts`: Physiological core (ZHL-16B/C, CNS, OTU).
-- `shared/engine/planner.ts`: Planning orchestrator and gas consumption.
+- `shared/engine/planner.ts`: Planning orchestrator (`planDive`), CCR bailout re-plan (`planBailout`) and gas requirements (`calculateGasRequirements`). Every tissue update goes through `DivePlanner.breathe()`, which also records open-circuit gas use; keep it that way so gas accounting matches the model.
 - `shared/engine/*.test.ts`: Vitest suites for the engine and planner.
 - `shared/config.ts`: `GASES` (standard diving gas database), `CYLINDERS` and `PLAN_DEFAULTS`.
 - `shared/types.ts`: Shared interfaces for CLI and Frontend.
