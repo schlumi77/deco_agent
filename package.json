@@ -1,6 +1,6 @@
 {
   "name": "deco-agent",
-  "version": "3.6.0",
+  "version": "3.6.1",
   "description": "Unified TypeScript Technical Diving Planner",
   "type": "module",
   "engines": {
