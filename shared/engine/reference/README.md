@@ -38,8 +38,9 @@ green while the numbers are being collected.
 The external planner must plan the dive the way this one does. Where it can't
 match a setting, plan as close as it allows and say what differs in `notes`.
 The reference dives are set up for **GUE Deco Planner** via `gue()` in
-`dives.ts`; **Baltic 1.0.2**, used for the CCR dive, shares those conventions.
-For another planner, adapt or replace that helper.
+`dives.ts`. The CCR dive uses **Baltic 1.0.2** via `baltic()`: its bottom time
+is time at depth, as here, and it also ascends at one rate to the surface.
+For another planner, add a helper with its conventions.
 
 | Setting | This planner |
 |---|---|

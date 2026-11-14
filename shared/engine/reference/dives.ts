@@ -18,7 +18,7 @@ import type { ReferenceDive, ReferenceResult } from './compare.js';
 
 const STANDARD_DECO = ['Tx 50/15', 'Oxygen'];
 
-// GUE Deco Planner conventions, shared by Baltic 1.0.2 (the CCR reference):
+// GUE Deco Planner conventions, the reference for the OC dives:
 // - its bottom time includes the descent, while this planner's starts on
 //   arrival at depth, so the descent is subtracted here;
 // - it ascends at the ascent rate all the way to the surface, without this
@@ -33,6 +33,14 @@ const gue = (input: DivePlanInput): DivePlanInput => {
         final_ascent_rate: input.ascent_rate ?? PLAN_DEFAULTS.ascent_rate,
     };
 };
+
+// Baltic 1.0.2 conventions, the reference for the CCR dive: the bottom time
+// is time at depth with the descent on top, as in this planner, and the
+// ascent rate applies all the way to the surface.
+const baltic = (input: DivePlanInput): DivePlanInput => ({
+    ...input,
+    final_ascent_rate: input.ascent_rate ?? PLAN_DEFAULTS.ascent_rate,
+});
 
 const dive = (
     id: string,
@@ -102,13 +110,13 @@ export const REFERENCE_DIVES: ReferenceDive[] = [
             notes: 'GUE does not apply the 1 m/min final ascent and counts the descent in the bottom time; planned here with gue() to match',
         }),
 
-    dive('ccr-60m-25min-tx1845-sp13', 'CCR, 60 m for 25 min, Tx 18/45 diluent, constant setpoint 1.3, no deco gases',
-        gue({ depth: 60, bottom_time: 25, bottom_gas: 'Tx 18/45', deco_gases: [], is_ccr: true, setpoint: 1.3, deco_setpoint: 1.3 }),
+    dive('ccr-60m-25min-tx1845-sp13', 'CCR, 60 m for 25 min at depth, Tx 18/45 diluent, constant setpoint 1.3, no deco gases',
+        baltic({ depth: 60, bottom_time: 25, bottom_gas: 'Tx 18/45', deco_gases: [], is_ccr: true, setpoint: 1.3, deco_setpoint: 1.3 }),
         {
             source: 'Baltic 1.0.2',
             first_stop: 27,
-            stops: [{ depth: 27, time: 1 }, { depth: 24, time: 1 }, { depth: 21, time: 2 }, { depth: 18, time: 2 }, { depth: 15, time: 3 }, { depth: 12, time: 5 }, { depth: 9, time: 6 }, { depth: 6, time: 28 }],
-            run_time: 76,
-            notes: 'Baltic shows 25 min when leaving 60 m and ascends at 10 m/min, the same conventions as GUE; planned here with gue() to match',
+            stops: [{ depth: 27, time: 1 }, { depth: 24, time: 1 }, { depth: 21, time: 2 }, { depth: 18, time: 3 }, { depth: 15, time: 4 }, { depth: 12, time: 4 }, { depth: 9, time: 7 }, { depth: 6, time: 33 }],
+            run_time: 87,
+            notes: 'planned in Baltic with the full 25 min at depth and a 10 m/min ascent to the surface; planned here with baltic() to match',
         }),
 ];
