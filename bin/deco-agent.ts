@@ -103,6 +103,7 @@ program
   .option('--deco-gas-setpoint <number>', 'CCR Deco Gas Switch Setpoint', parseNumber, PLAN_DEFAULTS.deco_gas_setpoint)
   .option('--desc-rate <number>', 'Descent Rate m/min', parseNumber, PLAN_DEFAULTS.descent_rate)
   .option('--asc-rate <number>', 'Ascent Rate m/min', parseNumber, PLAN_DEFAULTS.ascent_rate)
+  .option('--final-asc-rate <number>', 'Ascent rate over the last 10 m to the surface, m/min', parseNumber, PLAN_DEFAULTS.final_ascent_rate)
   .option('--model <string>', 'Bühlmann Model (B/C)', parseChoice(['b', 'c']), PLAN_DEFAULTS.model.toLowerCase())
   .option('--no-force-6m', 'Allow 3m stops')
   .option('--sac <number>', 'Open-circuit breathing rate at the surface, L/min', parseNumber, PLAN_DEFAULTS.sac_rate)
@@ -127,6 +128,7 @@ program
             deco_gas_setpoint: options.decoGasSetpoint,
             descent_rate: options.descRate,
             ascent_rate: options.ascRate,
+            final_ascent_rate: options.finalAscRate,
             force_6m: options.force6m !== false,
             model: options.model,
             sac_rate: options.sac,
@@ -148,7 +150,7 @@ program
             console.log(`${s.depth.toFixed(0).padStart(4)}m | ${s.run_time.toFixed(1).padStart(5)}min | ${s.time.toFixed(0).padStart(4)}min | ${s.gas.padEnd(12)} | ${s.cns.toFixed(1).padStart(5)}% | ${s.otu.toFixed(1).padStart(6)}`);
 
         console.log(chalk.bold(`\nDeco Schedule (${isCcr ? 'CCR' : 'OC'} | Model: ZH-L16${options.model.toUpperCase()} | GF: ${options.gfLow}/${options.gfHigh}):`));
-        console.log(chalk.gray(`Rates: Descent ${options.descRate}m/min, Ascent ${options.ascRate}m/min`));
+        console.log(chalk.gray(`Rates: Descent ${options.descRate}m/min, Ascent ${options.ascRate}m/min, last 10m ${options.finalAscRate}m/min`));
         scheduleHeader();
         result.schedule.forEach(scheduleRow);
 

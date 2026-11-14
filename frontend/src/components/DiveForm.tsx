@@ -142,6 +142,11 @@ const DiveForm: React.FC<Props> = ({ onPlanChange }) => {
           <input type="number" inputMode="numeric" name="ascent_rate" value={request.ascent_rate} onChange={handleChange} />
           <span className="unit-label">m/min</span>
         </div>
+        <div className="form-group-inline">
+          <label>LAST 10M</label>
+          <input type="number" inputMode="decimal" name="final_ascent_rate" step="1" value={request.final_ascent_rate} onChange={handleChange} />
+          <span className="unit-label">m/min</span>
+        </div>
       </div>
 
       <div className="toolbar-separator" />

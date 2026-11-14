@@ -37,13 +37,15 @@ green while the numbers are being collected.
 
 The external planner must plan the dive the way this one does. Where it can't
 match a setting, plan as close as it allows and say what differs in `notes`.
+The reference dives are set up for **GUE Deco Planner** via `gue()` in
+`dives.ts`; for another planner, adapt or replace that helper.
 
 | Setting | This planner |
 |---|---|
 | Model | Bühlmann ZHL-16C with gradient factors; GF Low applies at the first stop. ZHL-16B is not compared. |
 | Water and surface | Salt water, 10 m = 1 bar; surface pressure 1013 mbar |
-| Descent | 20 m/min. Bottom time starts on arrival at depth, so the bottom is left at descent time + bottom time. |
-| Ascent | 10 m/min up to 10 m, then 1 m/min from 10 m to the surface |
+| Descent | 20 m/min. This planner's bottom time starts on arrival at depth; the reference dives use `gue()` in `dives.ts`, which takes the reference planner's bottom time (descent included, as in GUE Deco Planner) and subtracts the descent. `npm run reference` prints both figures. |
+| Ascent | 10 m/min. Over the last 10 m this planner defaults to 1 m/min (`final_ascent_rate`); `gue()` sets it to the ascent rate, as GUE Deco Planner ascends at one rate to the surface. |
 | Stops | Every 3 m; last stop at 6 m unless the dive says 3 m; stop times in whole minutes |
 | Gas switches | On ascent, to the richest listed deco gas within pO2 1.6 that has more oxygen than the bottom gas. MODs use a 1 bar surface: oxygen at 6 m, Tx 50/15 at 22 m. On open circuit, a 1 min stop at each switch depth (21 m for Tx 50/15, 6 m for oxygen) even without a deco obligation there; GF Low stays anchored at the first stop the ceiling requires. No switch stop on the CCR loop, or at the bottom if the gas is usable there. |
 | Safety stop | None |

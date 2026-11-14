@@ -25,6 +25,7 @@
 -   **Safety First**:
     -   Integrated warnings for high CNS (>80%), excessive OTUs (>300), and gas volume violations.
     -   **6-meter Decompression Floor**: Enforces a minimum stop depth of 6m for technical safety.
+    -   **Slow final ascent**: the last 10 m to the surface are ascended at 1 m/min by default; set the rate with `--final-asc-rate` on the CLI or the LAST 10M field in the web form.
 -   **Modern Web Dashboard**:
     -   **Offline-capable** React 19 application running the engine directly in the browser.
     -   Interactive **Tissue Saturation Charts** and **Dive Profile Charts** (using Recharts).

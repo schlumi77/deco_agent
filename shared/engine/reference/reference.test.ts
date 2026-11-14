@@ -33,6 +33,14 @@ describe('Reference harness', () => {
         source: 'self-check', first_stop: ours.first_stop, stops: ours.stops, run_time: ours.run_time, ...overrides,
     });
 
+    it('plans every dive with GUE Deco Planner conventions', () => {
+        // gue() counts the descent in the bottom time and ascends at the
+        // ascent rate all the way to the surface.
+        const thirty = REFERENCE_DIVES.find(d => d.id === 'oc-30m-20min-air')!.input;
+        expect(thirty.bottom_time).toBeCloseTo(20 - 30 / 20, 9);
+        for (const d of REFERENCE_DIVES) expect(d.input.final_ascent_rate, d.id).toBe(10);
+    });
+
     it('defines unique ids and valid inputs for every dive', () => {
         expect(new Set(REFERENCE_DIVES.map(d => d.id)).size).toBe(REFERENCE_DIVES.length);
         for (const d of REFERENCE_DIVES) expect(() => planDive(d.input), d.id).not.toThrow();

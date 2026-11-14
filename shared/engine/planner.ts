@@ -36,11 +36,16 @@ export function getCcrMix(depth: number, dil: Gas, sp: number, surfacePressure =
     return [fo2_loop, fhe_loop];
 }
 
-export function getTravelTime(d1: number, d2: number, asc_rate: number): number {
+// Depth from which the final ascent rate applies, up to the surface.
+export const FINAL_ASCENT_DEPTH = 10.0;
+
+// Minutes to ascend from d1 to d2: at ascentRate below FINAL_ASCENT_DEPTH and
+// at finalAscentRate from there to the surface.
+export function getTravelTime(d1: number, d2: number, ascentRate: number, finalAscentRate: number): number {
     if (d1 <= d2) return 0.0;
-    if (d1 <= 10.0) return (d1 - d2) / 1.0;
-    if (d2 >= 10.0) return (d1 - d2) / asc_rate;
-    return (d1 - 10.0) / asc_rate + (10.0 - d2) / 1.0;
+    if (d1 <= FINAL_ASCENT_DEPTH) return (d1 - d2) / finalAscentRate;
+    if (d2 >= FINAL_ASCENT_DEPTH) return (d1 - d2) / ascentRate;
+    return (d1 - FINAL_ASCENT_DEPTH) / ascentRate + (FINAL_ASCENT_DEPTH - d2) / finalAscentRate;
 }
 
 function requirePositive(value: number, label: string) {
@@ -89,6 +94,7 @@ class DivePlanner {
     private setpoint: number;
     private descentRate: number;
     private ascentRate: number;
+    private finalAscentRate: number;
     private force6m: boolean;
 
     constructor(request: DivePlanRequest, bailout = false) {
@@ -111,6 +117,7 @@ class DivePlanner {
         requirePositive(bottomTime, 'Bottom time');
         requirePositive(descentRate, 'Descent rate');
         requirePositive(ascentRate, 'Ascent rate');
+        requirePositive(request.final_ascent_rate, 'Final ascent rate');
         requirePositive(request.gf_low, 'GF Low');
         requirePositive(request.gf_high, 'GF High');
         if (request.gf_high > 100) throw new Error(`GF High must not exceed 100% (got ${request.gf_high}%)`);
@@ -139,6 +146,7 @@ class DivePlanner {
         this.setpoint = setpoint;
         this.descentRate = descentRate;
         this.ascentRate = ascentRate;
+        this.finalAscentRate = request.final_ascent_rate;
         this.force6m = force6m;
 
         this.effectiveDecoSetpoint = decoSetpoint;
@@ -329,7 +337,7 @@ class DivePlanner {
             }
 
             if (ceiling <= nextStop && !switchStop) {
-                const tTime = getTravelTime(currentDepth, nextStop, this.ascentRate);
+                const tTime = getTravelTime(currentDepth, nextStop, this.ascentRate, this.finalAscentRate);
                 const [fo2, fhe] = this.updateGas(currentDepth, true, nextStop);
                 
                 this.breathe(currentDepth, nextStop, tTime, fo2, fhe);
@@ -364,7 +372,7 @@ class DivePlanner {
         let currentDepth = depth;
         while (currentDepth > 0) {
             const nextD = Math.max(0, currentDepth - 3);
-            const tTime = getTravelTime(currentDepth, nextD, this.ascentRate);
+            const tTime = getTravelTime(currentDepth, nextD, this.ascentRate, this.finalAscentRate);
             const [fo2, fhe] = this.updateGas(currentDepth, true, nextD);
 
             this.breathe(currentDepth, nextD, tTime, fo2, fhe);

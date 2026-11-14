@@ -38,6 +38,7 @@ export const PLAN_DEFAULTS = {
     deco_gas_setpoint: 1.4,
     descent_rate: 20,
     ascent_rate: 10,
+    final_ascent_rate: 1,
     force_6m: true,
     model: 'C',
     sac_rate: 15,
