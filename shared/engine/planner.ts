@@ -49,6 +49,10 @@ function requirePositive(value: number, label: string) {
     }
 }
 
+// Minutes spent at a gas switch depth to change to the new gas, on open
+// circuit, whether or not the ceiling requires a stop there.
+export const GAS_SWITCH_STOP_TIME = 1;
+
 class DivePlanner {
     private engine: DecoEngine;
     private totalTime = 0.0;
@@ -67,6 +71,8 @@ class DivePlanner {
     private bailout: boolean;
     private warnings: string[] = [];
     private currentGasName: string;
+    // The gas breathed on the last segment, to detect gas switches.
+    private breathingGas: Gas;
     private diluent: Gas;
     private decoCandidates: Gas[];
     // Listed deco gases left out because they carry no more oxygen than the bottom gas.
@@ -161,6 +167,7 @@ class DivePlanner {
             .map(g => g.name);
 
         this.currentGasName = this.getGasStable(this.diluent, isCcr ? setpoint : null);
+        this.breathingGas = this.diluent;
     }
 
     private getGasStable(dil: Gas, sp: number | null): string {
@@ -265,7 +272,8 @@ class DivePlanner {
     private updateGas(depth: number, isTravel = false, nextDepth?: number): [number, number] {
         const { gas, setpoint } = this.getBestGas(depth);
         this.currentGasName = this.getGasStable(gas, setpoint);
-        
+        this.breathingGas = gas;
+
         if (this.isCcr && setpoint !== null) {
             const d = isTravel && nextDepth !== undefined ? (depth + nextDepth) / 2 : depth;
             return getCcrMix(d, gas, setpoint, this.surfacePressure);
@@ -281,6 +289,8 @@ class DivePlanner {
         // that stop is found; from there the GF rises linearly to GF High at
         // the surface.
         let firstStopDepth: number | null = null;
+        // Minutes still owed for a gas switch at the current depth.
+        let switchTimeLeft = 0;
 
         while (currentDepth > 0) {
             stuckCounter++;
@@ -305,12 +315,20 @@ class DivePlanner {
                 nextStop = 0.0;
             }
 
-            if (currentDepth <= floor && this.engine.getCeiling(this.gfHigh) <= 0) {
+            // On open circuit, reaching a stop where a richer deco gas becomes
+            // usable starts a gas switch stop. At the bottom the diver switches
+            // on leaving instead. The CCR loop changes diluent without a stop.
+            if (!this.isCcr && currentDepth < this.depth && this.getBestGas(currentDepth).gas !== this.breathingGas) {
+                switchTimeLeft = GAS_SWITCH_STOP_TIME;
+            }
+            const switchStop = switchTimeLeft > 0;
+
+            if (currentDepth <= floor && !switchStop && this.engine.getCeiling(this.gfHigh) <= 0) {
                 this.finalAscent(currentDepth);
                 break;
             }
 
-            if (ceiling <= nextStop) {
+            if (ceiling <= nextStop && !switchStop) {
                 const tTime = getTravelTime(currentDepth, nextStop, this.ascentRate);
                 const [fo2, fhe] = this.updateGas(currentDepth, true, nextStop);
                 
@@ -320,7 +338,10 @@ class DivePlanner {
                 this.profile.push({ time: this.totalTime, depth: this.getDisplayDepth(currentDepth), gas: this.currentGasName });
                 stuckCounter = 0;
             } else {
-                if (firstStopDepth === null) firstStopDepth = currentDepth;
+                // GF Low stays anchored at the first stop the ceiling requires;
+                // a gas switch stop does not move it.
+                if (firstStopDepth === null && ceiling > nextStop) firstStopDepth = currentDepth;
+                if (switchStop) switchTimeLeft -= 1;
                 const [fo2, fhe] = this.updateGas(currentDepth);
                 const { gas, setpoint } = this.getBestGas(currentDepth);
 

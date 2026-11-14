@@ -103,7 +103,7 @@ This updates `package.json` and `package-lock.json` together; commit both. Leave
 
 **Engine & data (shared):**
 - `shared/engine/deco_engine.ts`: Physiological core (ZHL-16B/C, CNS, OTU).
-- `shared/engine/planner.ts`: Planning orchestrator (`planDive`), CCR bailout re-plan (`planBailout`) and gas requirements checked against the cylinder kit (`calculateGasRequirements`). Every tissue update goes through `DivePlanner.breathe()`, which also records open-circuit gas use; keep it that way so gas accounting matches the model.
+- `shared/engine/planner.ts`: Planning orchestrator (`planDive`), gas switch stops on open circuit (`GAS_SWITCH_STOP_TIME`, GF Low stays anchored at the first required stop), CCR bailout re-plan (`planBailout`) and gas requirements checked against the cylinder kit (`calculateGasRequirements`). Every tissue update goes through `DivePlanner.breathe()`, which also records open-circuit gas use; keep it that way so gas accounting matches the model.
 - `shared/engine/*.test.ts`: Vitest suites for the engine and planner.
 - `shared/engine/reference/`: Reference dives compared with an external planner (`dives.ts`), the comparison and tolerances (`compare.ts`), `npm run reference` (`report.ts`) and the settings to match (`README.md`). A failing reference dive means a defect or an unshared convention; find out which before widening a tolerance.
 - `shared/config.ts`: `GASES` (standard diving gas database), `CYLINDERS` (the default kit: bottom or diluent/bailout, stage, CCR onboard oxygen) and `PLAN_DEFAULTS`.

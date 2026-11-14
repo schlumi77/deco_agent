@@ -45,7 +45,7 @@ match a setting, plan as close as it allows and say what differs in `notes`.
 | Descent | 20 m/min. Bottom time starts on arrival at depth, so the bottom is left at descent time + bottom time. |
 | Ascent | 10 m/min up to 10 m, then 1 m/min from 10 m to the surface |
 | Stops | Every 3 m; last stop at 6 m unless the dive says 3 m; stop times in whole minutes |
-| Gas switches | On ascent, to the richest listed deco gas within pO2 1.6 that has more oxygen than the bottom gas. MODs use a 1 bar surface: oxygen at 6 m, Tx 50/15 at 22 m. No extra time is added for a switch. |
+| Gas switches | On ascent, to the richest listed deco gas within pO2 1.6 that has more oxygen than the bottom gas. MODs use a 1 bar surface: oxygen at 6 m, Tx 50/15 at 22 m. On open circuit, a 1 min stop at each switch depth (21 m for Tx 50/15, 6 m for oxygen) even without a deco obligation there; GF Low stays anchored at the first stop the ceiling requires. No switch stop on the CCR loop, or at the bottom if the gas is usable there. |
 | Safety stop | None |
 | CCR | Constant setpoint; loop mix computed with water vapour 0.0627 bar |
 
