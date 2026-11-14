@@ -37,10 +37,14 @@ export function calculateEnd(depth: number, fhe: number, surfacePressure = SURFA
     return (p_amb * (1 - fhe) - surfacePressure) * 10;
 }
 
+// Loop oxygen and helium fractions on a CCR holding setpoint `sp` at a depth.
+// Where the setpoint exceeds the dry ambient pressure (shallower than about
+// 3.5 m at setpoint 1.3) it cannot be reached: the loop is pure oxygen and the
+// actual pO2 is the dry ambient pressure.
 export function getCcrMix(depth: number, dil: Gas, sp: number, surfacePressure = SURFACE_PRESSURE): [number, number] {
     const p_amb = surfacePressure + depth / 10.0;
     const p_dry_total = p_amb - WATER_VAPOR_PRESSURE;
-    const fo2_loop = Math.max(dil.fO2, sp / p_dry_total);
+    const fo2_loop = Math.min(1.0, Math.max(dil.fO2, sp / p_dry_total));
     const f_inert_total = 1.0 - fo2_loop;
     const f_inert_dil = 1.0 - dil.fO2;
     const fhe_loop = f_inert_dil > 0 ? f_inert_total * (dil.fHe / f_inert_dil) : 0.0;

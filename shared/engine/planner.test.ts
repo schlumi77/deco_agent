@@ -56,6 +56,13 @@ describe('CCR Gas Display', () => {
         }
     });
 
+    it('labels an unreachable setpoint as a pure oxygen loop', () => {
+        // At a 3 m stop, setpoint 1.3 exceeds the dry ambient pressure.
+        const result = planDive({ depth: 60, bottom_time: 22, bottom_gas: 'Tx 18/45', deco_gases: [], is_ccr: true, setpoint: 1.3, force_6m: false });
+        const threeMetre = result.schedule.find(s => s.depth === 3)!;
+        expect(threeMetre.gas).toBe('CCR SP 1.3 [100/0]');
+    });
+
     it('should NOT include brackets for OC dives', () => {
         const result = planDive({ depth: 50, bottom_time: 20, bottom_gas: "Tx 18/45", deco_gases: ["Tx 50/15", "Oxygen"] });
         
