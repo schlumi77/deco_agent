@@ -7,6 +7,7 @@ import {
     PLAN_DEFAULTS,
     CYLINDERS,
     GASES,
+    GAS_SWITCH_STOP_TIME,
     calculateMod,
     gasLimitPo2,
 } from './planner.js';
@@ -210,16 +211,18 @@ describe('Gradient factor handling', () => {
     // GF Low alone, and `surface_gf` reported tissue tension as a share of the
     // M-value rather than a gradient factor.
 
+    // No deco gases here, so the first stop is the one the ceiling requires
+    // rather than a gas switch stop.
     it('lets GF Low alone decide the first stop', () => {
-        const gf80 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES });
-        const gf95 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, gf_high: 95 });
+        const gf80 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: [] });
+        const gf95 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: [], gf_high: 95 });
         expect(gf80.schedule[1].depth).toBe(18);
         expect(gf95.schedule[1].depth).toBe(gf80.schedule[1].depth);
     });
 
     it('starts stops deeper when GF Low is reduced', () => {
-        const gf50 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES });
-        const gf30 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES, gf_low: 30 });
+        const gf50 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: [] });
+        const gf30 = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: [], gf_low: 30 });
         expect(gf30.schedule[1].depth).toBeGreaterThan(gf50.schedule[1].depth);
     });
 
@@ -544,5 +547,50 @@ describe('Gas limit convention', () => {
         expect(gasLimitPo2(1.0, 6)).toBeCloseTo(1.6, 9);
         expect(engine.toxicity_tracker.otus).toBeCloseTo(Math.pow((realPo2 - 0.5) / 0.5, 0.833), 9);
         expect(engine.toxicity_tracker.otus).toBeGreaterThan(Math.pow((1.6 - 0.5) / 0.5, 0.833));
+    });
+});
+
+describe('Gas switch stops', () => {
+    // On open circuit the diver stops at each deco gas's switch depth to
+    // change gas (21 m for Tx 50/15, 6 m for oxygen), whether or not the
+    // ceiling requires a stop there. Previously the planner switched in
+    // passing on the way to the next required stop.
+
+    const stops = (res: DivePlanResponse) => res.schedule.slice(1).map(s => [s.depth, s.time]);
+
+    it('stops at the switch depth to change gas, before the first required stop', () => {
+        expect(GAS_SWITCH_STOP_TIME).toBe(1);
+        const res = planDive({ depth: 45, bottom_time: 20, bottom_gas: 'Tx 21/35', deco_gases: ['Tx 50/15'] });
+        expect(res.schedule[1]).toMatchObject({ depth: 21, time: 1, gas: 'Tx 50/15' });
+        // Without the deco gas the first required stop is at 15 m, so 21 m is a switch stop.
+        const noDecoGas = planDive({ depth: 45, bottom_time: 20, bottom_gas: 'Tx 21/35', deco_gases: [] });
+        expect(noDecoGas.schedule[1].depth).toBe(15);
+    });
+
+    it('keeps GF Low anchored at the first required stop, not the switch stop', () => {
+        // Anchoring at 21 m would drop the 15 m stop and lengthen the 6 m stop.
+        const res = planDive({ depth: 45, bottom_time: 20, bottom_gas: 'Tx 21/35', deco_gases: ['Tx 50/15'] });
+        expect(stops(res)).toEqual([[21, 1], [15, 1], [12, 2], [9, 2], [6, 13]]);
+    });
+
+    it('makes switch stops on a dive without a deco obligation', () => {
+        const withGases = planDive({ depth: 25, bottom_time: 10, bottom_gas: 'Air', deco_gases: ['Tx 50/15', 'Oxygen'] });
+        expect(stops(withGases)).toEqual([[21, 1], [6, 1]]);
+        expect(withGases.schedule.map(s => s.gas)).toEqual(['Air', 'Tx 50/15', 'Oxygen']);
+        const without = planDive({ depth: 25, bottom_time: 10, bottom_gas: 'Air', deco_gases: [] });
+        expect(stops(without)).toEqual([]);
+    });
+
+    it('switches on leaving the bottom, without a stop, when the gas is usable there', () => {
+        // Tx 50/15 is within its MOD at 20 m.
+        const res = planDive({ depth: 20, bottom_time: 20, bottom_gas: 'Air', deco_gases: ['Tx 50/15'] });
+        expect(stops(res)).toEqual([]);
+        expect(Object.keys(res.gas_usage)).toEqual(['Air', 'Tx 50/15']);
+    });
+
+    it('makes switch stops on bailout but not on the CCR loop', () => {
+        const dive = { depth: 40, bottom_time: 20, bottom_gas: 'Tx 21/35', deco_gases: ['Tx 50/15'], is_ccr: true, setpoint: 1.3 };
+        expect(planDive(dive).schedule.some(s => s.depth === 21)).toBe(false);
+        expect(planBailout(dive).schedule[1]).toMatchObject({ depth: 21, time: 1, gas: 'Tx 50/15' });
     });
 });
