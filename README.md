@@ -17,7 +17,7 @@
 -   **Oxygen Toxicity Tracking**: Real-time calculation of **CNS%** (NOAA limits) and **OTUs** (pulmonary toxicity).
 -   **Gas Management & Physics**:
     -   Calculates **MOD**, **MinOD**, **END**, and **Gas Density**.
-    -   Supports **mCCR (Constant Setpoint)** and **Open Circuit** planning.
+    -   Supports **mCCR (Constant Setpoint)** and **Open Circuit** planning. On the loop, inert gas loading uses the conservative convention of ambient pressure minus the setpoint.
     -   Automated **Bailout Schedule** for CCR dives: the ascent is re-planned on open circuit from the end of bottom time (the worst case), and bailout gas is sized from that ascent.
     -   **Deco gas selection**: on the ascent the planner switches to the richest listed deco gas at its standard switch depth (oxygen 6 m, Tx 50/15 21 m, Tx 35/35 36 m: the MOD rounded to the nearest 3 m stop), and only to gases with more oxygen than the bottom gas; listed gases it skips are reported. On open circuit, including CCR bailout, it makes a 1 min **gas switch stop** at each switch depth (21 m for Tx 50/15, 6 m for oxygen). Deco gases are chosen with `--deco` on the CLI (default Tx 50/15 and oxygen) or in the web form.
     -   **Gas requirements** from the gas actually breathed in each segment, at an adjustable SAC (default 15 L/min) with a 1.5x reserve.

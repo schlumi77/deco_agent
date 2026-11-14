@@ -119,7 +119,11 @@ export class DecoEngine {
         return p_inspired_start + rate * (time - 1/k) - (p_inspired_start - initial_tension - rate/k) * Math.exp(-k * time);
     }
 
-    updateTissues(depth_start: number, depth_end: number, time: number, fo2: number, fhe: number) {
+    // Loads the tissues for one segment breathing dry gas fractions fo2/fhe.
+    // `toxicity_fo2`, if given, is the oxygen fraction used for CNS/OTU instead
+    // of fo2: on the CCR loop the inert loading follows a conservative
+    // convention while oxygen exposure follows the physical loop mix.
+    updateTissues(depth_start: number, depth_end: number, time: number, fo2: number, fhe: number, toxicity_fo2?: number) {
         if (time <= 0) return;
         
         const p_amb_start = this.surface_pressure + depth_start / 10.0;
@@ -127,7 +131,7 @@ export class DecoEngine {
         const rate_amb = (p_amb_end - p_amb_start) / time;
 
         const avg_p_amb = (p_amb_start + p_amb_end) / 2.0;
-        const po2 = avg_p_amb * fo2;
+        const po2 = avg_p_amb * (toxicity_fo2 ?? fo2);
         this.toxicity_tracker.addExposure(po2, time);
 
         const fn2 = 1.0 - fo2 - fhe;

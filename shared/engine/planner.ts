@@ -56,6 +56,38 @@ export const FINAL_ASCENT_DEPTH = 10.0;
 
 // Minutes to ascend from d1 to d2: at ascentRate below FINAL_ASCENT_DEPTH and
 // at finalAscentRate from there to the surface.
+// Gas fractions for loading the tissues on a CCR loop. The diver breathes
+// inert gas at ambient pressure minus the setpoint, with no deduction for
+// water vapour in the loop. That is more conservative than the physical loop
+// mix from getCcrMix(), mostly at shallow stops, and matches mainstream CCR
+// planners such as Baltic. The fractions are dry fractions, so the engine's
+// alveolar correction yields exactly that inert pressure; helium and nitrogen
+// keep the diluent's ratio. CNS/OTU and the displayed loop mix still use
+// getCcrMix().
+export function getCcrLoadingMix(depth: number, dil: Gas, sp: number, surfacePressure = SURFACE_PRESSURE): [number, number] {
+    const p_amb = surfacePressure + depth / 10.0;
+    const p_dry_total = p_amb - WATER_VAPOR_PRESSURE;
+    const f_inert_dil = 1.0 - dil.fO2;
+    // Never more inert gas than the diluent itself carries.
+    const f_inert = Math.min(f_inert_dil, Math.max(0, p_amb - sp) / p_dry_total);
+    const fhe_loop = f_inert_dil > 0 ? f_inert * (dil.fHe / f_inert_dil) : 0.0;
+    return [1.0 - f_inert, fhe_loop];
+}
+
+// What the diver breathes on one segment: dry fractions for the tissues, and
+// the oxygen fraction for CNS/OTU where it differs (the CCR loop).
+interface BreathingMix {
+    fo2: number;
+    fhe: number;
+    toxicityFo2?: number;
+}
+
+function ccrBreathingMix(depth: number, dil: Gas, sp: number, surfacePressure: number): BreathingMix {
+    const [fo2, fhe] = getCcrLoadingMix(depth, dil, sp, surfacePressure);
+    const [physicalFo2] = getCcrMix(depth, dil, sp, surfacePressure);
+    return { fo2, fhe, toxicityFo2: physicalFo2 };
+}
+
 export function getTravelTime(d1: number, d2: number, ascentRate: number, finalAscentRate: number): number {
     if (d1 <= d2) return 0.0;
     if (d1 <= FINAL_ASCENT_DEPTH) return (d1 - d2) / finalAscentRate;
@@ -245,8 +277,8 @@ class DivePlanner {
 
     // Loads the tissues for one segment and, on open circuit, records the gas
     // breathed against the gas currently in use.
-    private breathe(depthStart: number, depthEnd: number, time: number, fo2: number, fhe: number) {
-        this.engine.updateTissues(depthStart, depthEnd, time, fo2, fhe);
+    private breathe(depthStart: number, depthEnd: number, time: number, mix: BreathingMix) {
+        this.engine.updateTissues(depthStart, depthEnd, time, mix.fo2, mix.fhe, mix.toxicityFo2);
         if (!this.isCcr && time > 0) {
             const avgPressure = this.surfacePressure + (depthStart + depthEnd) / 20.0;
             this.gasUsage[this.currentGasName] = (this.gasUsage[this.currentGasName] ?? 0) + avgPressure * time;
@@ -259,8 +291,10 @@ class DivePlanner {
         while (currentD < this.depth) {
             const nextD = Math.min(this.depth, currentD + 3.0);
             const segmentTime = (nextD - currentD) / this.descentRate;
-            const [fo2, fhe] = this.isCcr ? getCcrMix((currentD + nextD) / 2, this.diluent, this.setpoint, this.surfacePressure) : [this.diluent.fO2, this.diluent.fHe];
-            this.breathe(currentD, nextD, segmentTime, fo2, fhe);
+            const mix = this.isCcr
+                ? ccrBreathingMix((currentD + nextD) / 2, this.diluent, this.setpoint, this.surfacePressure)
+                : { fo2: this.diluent.fO2, fhe: this.diluent.fHe };
+            this.breathe(currentD, nextD, segmentTime, mix);
             this.totalTime += segmentTime;
             currentD = nextD;
             this.profile.push({ time: this.totalTime, depth: currentD, gas: this.currentGasName });
@@ -268,8 +302,10 @@ class DivePlanner {
     }
 
     private stayAtBottom() {
-        const [bfo2, bfhe] = this.isCcr ? getCcrMix(this.depth, this.diluent, this.setpoint, this.surfacePressure) : [this.diluent.fO2, this.diluent.fHe];
-        this.breathe(this.depth, this.depth, this.bottomTime, bfo2, bfhe);
+        const mix = this.isCcr
+            ? ccrBreathingMix(this.depth, this.diluent, this.setpoint, this.surfacePressure)
+            : { fo2: this.diluent.fO2, fhe: this.diluent.fHe };
+        this.breathe(this.depth, this.depth, this.bottomTime, mix);
         this.totalTime += this.bottomTime;
         this.profile.push({ time: this.totalTime, depth: this.depth, gas: this.currentGasName });
         this.bottomCns = this.engine.toxicity_tracker.cns_percent;
@@ -292,16 +328,16 @@ class DivePlanner {
         };
     }
 
-    private updateGas(depth: number, isTravel = false, nextDepth?: number): [number, number] {
+    private updateGas(depth: number, isTravel = false, nextDepth?: number): BreathingMix {
         const { gas, setpoint } = this.getBestGas(depth);
         this.currentGasName = this.getGasStable(gas, setpoint);
         this.breathingGas = gas;
 
         if (this.isCcr && setpoint !== null) {
             const d = isTravel && nextDepth !== undefined ? (depth + nextDepth) / 2 : depth;
-            return getCcrMix(d, gas, setpoint, this.surfacePressure);
+            return ccrBreathingMix(d, gas, setpoint, this.surfacePressure);
         }
-        return [gas.fO2, gas.fHe];
+        return { fo2: gas.fO2, fhe: gas.fHe };
     }
 
     private ascend() {
@@ -353,9 +389,9 @@ class DivePlanner {
 
             if (ceiling <= nextStop && !switchStop) {
                 const tTime = getTravelTime(currentDepth, nextStop, this.ascentRate, this.finalAscentRate);
-                const [fo2, fhe] = this.updateGas(currentDepth, true, nextStop);
+                const mix = this.updateGas(currentDepth, true, nextStop);
                 
-                this.breathe(currentDepth, nextStop, tTime, fo2, fhe);
+                this.breathe(currentDepth, nextStop, tTime, mix);
                 this.totalTime += tTime;
                 currentDepth = nextStop;
                 this.profile.push({ time: this.totalTime, depth: this.getDisplayDepth(currentDepth), gas: this.currentGasName });
@@ -365,10 +401,10 @@ class DivePlanner {
                 // a gas switch stop does not move it.
                 if (firstStopDepth === null && ceiling > nextStop) firstStopDepth = currentDepth;
                 if (switchStop) switchTimeLeft -= 1;
-                const [fo2, fhe] = this.updateGas(currentDepth);
+                const mix = this.updateGas(currentDepth);
                 const { gas, setpoint } = this.getBestGas(currentDepth);
 
-                this.breathe(currentDepth, currentDepth, 1.0, fo2, fhe);
+                this.breathe(currentDepth, currentDepth, 1.0, mix);
                 this.totalTime += 1.0;
                 this.profile.push({ time: this.totalTime, depth: this.getDisplayDepth(currentDepth), gas: this.currentGasName });
                 this.decoSchedule.push([
@@ -388,9 +424,9 @@ class DivePlanner {
         while (currentDepth > 0) {
             const nextD = Math.max(0, currentDepth - 3);
             const tTime = getTravelTime(currentDepth, nextD, this.ascentRate, this.finalAscentRate);
-            const [fo2, fhe] = this.updateGas(currentDepth, true, nextD);
+            const mix = this.updateGas(currentDepth, true, nextD);
 
-            this.breathe(currentDepth, nextD, tTime, fo2, fhe);
+            this.breathe(currentDepth, nextD, tTime, mix);
             this.totalTime += tTime;
             currentDepth = nextD;
             this.profile.push({ time: this.totalTime, depth: this.getDisplayDepth(currentDepth), gas: this.currentGasName });
