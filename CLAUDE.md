@@ -70,7 +70,7 @@ Requires Node.js 20 or higher.
 5.  **Keep CI Green**: Any engine or CLI change must pass `npm run typecheck` and `npm run test -- run`, and any frontend change must pass `npm run lint` and `npm run build` in `frontend/`. CI runs all four on every PR.
 6.  **Single Version Source**: The app version comes from the root `package.json`: the web app reads it via the `__APP_VERSION__` define in `frontend/vite.config.ts`, the CLI reads the file at startup. Do not hardcode version strings.
 7.  **Single Agent Instructions File**: `CLAUDE.md` is the only agent instructions file for this repo. Keep it current when structure or conventions change, and do not add parallel files such as `GEMINI.md` or `AGENTS.md`.
-8.  **Single Defaults Source**: Plan defaults (deco gases, GFs, setpoints, rates, model, 6 m floor, SAC, CCR oxygen use, cylinder sizes) live in `PLAN_DEFAULTS` in `shared/config.ts`. The engine, CLI and web form all read them from there; do not restate default values elsewhere.
+8.  **Single Defaults Source**: Plan defaults (deco gases, GFs, setpoints, descent and ascent rates including the final ascent rate over the last 10 m, model, 6 m floor, SAC, CCR oxygen use, cylinder sizes) live in `PLAN_DEFAULTS` in `shared/config.ts`. The engine, CLI and web form all read them from there; do not restate default values elsewhere.
 9.  **Version Every PR**: Every PR bumps the version in the root `package.json` following Semantic Versioning. See [Versioning](#versioning) for which level to pick and how.
 
 ## Versioning

@@ -8,6 +8,7 @@ import {
     CYLINDERS,
     GASES,
     GAS_SWITCH_STOP_TIME,
+    getTravelTime,
     calculateMod,
     gasLimitPo2,
 } from './planner.js';
@@ -593,4 +594,46 @@ describe('Gas switch stops', () => {
         expect(planDive(dive).schedule.some(s => s.depth === 21)).toBe(false);
         expect(planBailout(dive).schedule[1]).toMatchObject({ depth: 21, time: 1, gas: 'Tx 50/15' });
     });
+});
+
+describe('Final ascent rate', () => {
+    // The last 10 m to the surface used a fixed 1 m/min. It is now a plan
+    // setting, so plans can match planners that ascend at the ascent rate
+    // all the way up, such as GUE Deco Planner.
+
+    it('splits travel time at 10 m between the ascent and final ascent rates', () => {
+        expect(getTravelTime(30, 12, 10, 1)).toBeCloseTo(1.8, 9);   // all below 10 m
+        expect(getTravelTime(9, 6, 10, 1)).toBeCloseTo(3, 9);       // all within the last 10 m
+        expect(getTravelTime(12, 6, 10, 1)).toBeCloseTo(0.2 + 4, 9);
+        expect(getTravelTime(30, 0, 10, 10)).toBeCloseTo(3, 9);
+        expect(getTravelTime(6, 9, 10, 1)).toBe(0);
+    });
+
+    it('defaults to 1 m/min, so plans are unchanged', () => {
+        expect(PLAN_DEFAULTS.final_ascent_rate).toBe(1);
+        const dive = { depth: 50, bottom_time: 20, bottom_gas: 'Air', deco_gases: DECO_GASES };
+        expect(planDive(dive)).toEqual(planDive({ ...dive, final_ascent_rate: 1 }));
+    });
+
+    it('trades slow final ascent for stop time', () => {
+        // The slow ascent off-gasses on the way up, so it needs less stop time;
+        // ascending faster needs more stops but surfaces sooner overall.
+        const dive = { depth: 30, bottom_time: 18.5, bottom_gas: 'Air', deco_gases: ['Oxygen'] };
+        const slow = planDive(dive);
+        const fast = planDive({ ...dive, final_ascent_rate: 10 });
+        const runTime = (r: DivePlanResponse) => r.profile[r.profile.length - 1].time;
+        const stopTime = (r: DivePlanResponse) => r.schedule.slice(1).reduce((t, s) => t + s.time, 0);
+        expect(stopsOf(slow)).toEqual([[6, 1]]);
+        expect(stopsOf(fast)).toEqual([[9, 1], [6, 2]]);
+        expect(stopTime(fast)).toBeGreaterThan(stopTime(slow));
+        expect(runTime(fast)).toBeLessThan(runTime(slow));
+    });
+
+    it('rejects a non-positive final ascent rate', () => {
+        expect(() => planDive({ depth: 30, bottom_time: 20, bottom_gas: 'Air', final_ascent_rate: 0 })).toThrow(/Final ascent rate/);
+    });
+
+    function stopsOf(res: DivePlanResponse) {
+        return res.schedule.slice(1).map(s => [s.depth, s.time]);
+    }
 });

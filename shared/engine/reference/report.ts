@@ -16,9 +16,12 @@ for (const dive of REFERENCE_DIVES) {
         : 'OC';
 
     console.log(`\n${dive.id}: ${dive.description}`);
-    console.log(`  plan:      ${input.depth} m, ${input.bottom_time} min bottom time (descent not included), ${input.bottom_gas}, ${mode}`);
+    const descent = input.depth / input.descent_rate;
+    const fmt = (n: number) => Number(n.toFixed(2)).toString();
+    console.log(`  plan:      ${input.depth} m, ${input.bottom_gas}, ${mode}`);
+    console.log(`             bottom time ${fmt(input.bottom_time + descent)} min including the ${fmt(descent)} min descent (${fmt(input.bottom_time)} min at depth)`);
     console.log(`             deco gases: ${input.deco_gases.length > 0 ? input.deco_gases.join(', ') : 'none'}`);
-    console.log(`             ZHL-16${input.model}, GF ${input.gf_low}/${input.gf_high}, descent ${input.descent_rate} m/min, ascent ${input.ascent_rate} m/min, last stop ${input.force_6m ? 6 : 3} m`);
+    console.log(`             ZHL-16${input.model}, GF ${input.gf_low}/${input.gf_high}, descent ${input.descent_rate} m/min, ascent ${input.ascent_rate} m/min (last 10 m: ${input.final_ascent_rate} m/min), last stop ${input.force_6m ? 6 : 3} m`);
     console.log(`  ours:      first stop ${ours.first_stop} m | ${formatStops(ours.stops)} | run time ${ours.run_time.toFixed(1)} min`);
 
     if (dive.reference === null) {

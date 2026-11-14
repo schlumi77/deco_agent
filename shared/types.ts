@@ -93,6 +93,7 @@ export interface DivePlanRequest {
     deco_gas_setpoint: number;
     descent_rate: number;
     ascent_rate: number;
+    final_ascent_rate: number; // m/min over the last FINAL_ASCENT_DEPTH (10 m) to the surface
     force_6m: boolean;
     model: string;
     // Gas planning; planDive() ignores these.
