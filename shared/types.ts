@@ -3,6 +3,10 @@ export interface Gas {
     fO2: number;
     fHe: number;
     type: string;
+    // Deco gases: the depth (m) at which the ascent switches to this gas, the
+    // standard switch depth divers use. Gases without one switch at their MOD
+    // for pO2 1.6.
+    switch_depth?: number;
 }
 
 export interface ScheduleEntry {

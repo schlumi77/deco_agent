@@ -10,6 +10,17 @@ export function gasLimitPo2(fo2: number, depth: number): number {
     return (GAS_LIMIT_SURFACE_PRESSURE + depth / 10) * fo2;
 }
 
+// Maximum pO2 for switching to a deco gas that has no listed switch depth.
+export const DECO_GAS_MAX_PO2 = 1.6;
+
+// Whether the ascent may switch to a deco gas at a depth: down to its listed
+// switch depth, or down to its MOD for DECO_GAS_MAX_PO2 if it has none.
+export function canSwitchTo(gas: Gas, depth: number): boolean {
+    return gas.switch_depth !== undefined
+        ? depth <= gas.switch_depth
+        : gasLimitPo2(gas.fO2, depth) <= DECO_GAS_MAX_PO2;
+}
+
 export function calculateMod(fo2: number, maxPo2: number, surfacePressure = GAS_LIMIT_SURFACE_PRESSURE): number {
     if (fo2 <= 0) return Infinity;
     return (maxPo2 / fo2 - surfacePressure) * 10;
@@ -264,7 +275,7 @@ class DivePlanner {
 
     private getBestGas(d: number): { gas: Gas; setpoint: number | null } {
         for (const g of this.decoCandidates) {
-            if (gasLimitPo2(g.fO2, d) <= 1.6) {
+            if (canSwitchTo(g, d)) {
                 return { 
                     gas: g, 
                     setpoint: this.isCcr ? this.effectiveDecoGasSetpoint : null 
