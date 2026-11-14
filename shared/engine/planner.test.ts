@@ -11,6 +11,7 @@ import {
     getTravelTime,
     calculateMod,
     gasLimitPo2,
+    canSwitchTo,
 } from './planner.js';
 import { SURFACE_PRESSURE, DecoEngine } from './deco_engine.js';
 import type { DivePlanResponse } from '../types.js';
@@ -53,6 +54,13 @@ describe('CCR Gas Display', () => {
             expect(oxygenStop.gas).toContain('CCR Oxygen SP 1.4');
             expect(oxygenStop.gas).toContain('[100/0]');
         }
+    });
+
+    it('labels an unreachable setpoint as a pure oxygen loop', () => {
+        // At a 3 m stop, setpoint 1.3 exceeds the dry ambient pressure.
+        const result = planDive({ depth: 60, bottom_time: 22, bottom_gas: 'Tx 18/45', deco_gases: [], is_ccr: true, setpoint: 1.3, force_6m: false });
+        const threeMetre = result.schedule.find(s => s.depth === 3)!;
+        expect(threeMetre.gas).toBe('CCR SP 1.3 [100/0]');
     });
 
     it('should NOT include brackets for OC dives', () => {
@@ -522,13 +530,10 @@ describe('Gas limit convention', () => {
     // and the `gases` table used 1.013 bar, so oxygen was used at 6 m while
     // its MOD was listed as 5.9 m. All gas limits now share one convention.
 
-    it('switches to a deco gas exactly down to the MOD the gases table shows', () => {
-        for (const gas of GASES.filter(g => g.type === 'deco')) {
+    it('computes MODs and the gas-limit pO2 with the same convention', () => {
+        for (const gas of GASES) {
             const mod = calculateMod(gas.fO2, 1.6);
-            for (let depth = 0; depth <= 100; depth++) {
-                const switchable = gasLimitPo2(gas.fO2, depth) <= 1.6;
-                expect(switchable, `${gas.name} at ${depth} m`).toBe(depth <= mod + 1e-9);
-            }
+            expect(gasLimitPo2(gas.fO2, mod), gas.name).toBeCloseTo(1.6, 9);
         }
     });
 
@@ -636,4 +641,47 @@ describe('Final ascent rate', () => {
     function stopsOf(res: DivePlanResponse) {
         return res.schedule.slice(1).map(s => [s.depth, s.time]);
     }
+});
+
+describe('Gas switch depths', () => {
+    // Regression: the ascent switched to a deco gas at the deepest 3 m stop
+    // within pO2 1.6, so Tx 35/35 came in at 33 m. Divers, and GUE Deco
+    // Planner, use standard switch depths: the MOD rounded to the nearest
+    // 3 m stop, which puts Tx 35/35 at 36 m.
+
+    const decoGases = GASES.filter(g => g.type === 'deco');
+
+    it('gives every deco gas its standard switch depth', () => {
+        expect(Object.fromEntries(decoGases.map(g => [g.name, g.switch_depth]))).toEqual({
+            'Oxygen': 6, 'Tx 50/15': 21, 'Tx 35/35': 36, 'Tx 24/35': 57, 'Tx 17/70': 84,
+        });
+        for (const g of decoGases) {
+            // On the 3 m stop grid, at the stop nearest the MOD, so within
+            // 1.5 m of it and never far above pO2 1.6.
+            expect(g.switch_depth! % 3, g.name).toBe(0);
+            expect(g.switch_depth, g.name).toBe(Math.round(calculateMod(g.fO2, 1.6) / 3) * 3);
+            expect(gasLimitPo2(g.fO2, g.switch_depth!), g.name).toBeLessThanOrEqual(1.61 + 1e-9);
+        }
+    });
+
+    it('switches to a deco gas exactly down to its switch depth', () => {
+        for (const g of decoGases) {
+            for (let depth = 0; depth <= 100; depth++) {
+                expect(canSwitchTo(g, depth), `${g.name} at ${depth} m`).toBe(depth <= g.switch_depth!);
+            }
+        }
+    });
+
+    it('falls back to the MOD for pO2 1.6 for a gas without a switch depth', () => {
+        const nx32 = GASES.find(g => g.name === 'Nx 32')!;
+        expect(nx32.switch_depth).toBeUndefined();
+        expect(canSwitchTo(nx32, 40)).toBe(true);   // MOD 40 m
+        expect(canSwitchTo(nx32, 41)).toBe(false);
+    });
+
+    it('switches to Tx 35/35 at 36 m on a deep trimix dive', () => {
+        const res = planDive({ depth: 90, bottom_time: 25.5, bottom_gas: 'Tx 12/65', deco_gases: ['Tx 35/35', 'Tx 50/15', 'Oxygen'], gf_low: 40, gf_high: 70 });
+        expect(res.schedule.find(s => s.depth === 36)?.gas).toBe('Tx 35/35');
+        expect(res.schedule.find(s => s.depth === 39)?.gas).toBe('Tx 12/65');
+    });
 });

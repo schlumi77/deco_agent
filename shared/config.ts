@@ -1,12 +1,16 @@
 import type { Gas, Cylinder, CylinderKit } from './types.js';
 
+// Deco gases carry their standard switch depth: the MOD for pO2 1.6 rounded
+// to the nearest 3 m stop, as in GUE practice (oxygen 6 m, Tx 50/15 21 m,
+// Tx 35/35 36 m). Where that rounds deeper than the MOD, the switch is at a
+// pO2 slightly above 1.6 (Tx 35/35 at 36 m: 1.61).
 export const GASES: Gas[] = [
     {"name": "Air", "fO2": 0.21, "fHe": 0.00, "type": "bottom"},
-    {"name": "Oxygen", "fO2": 1.00, "fHe": 0.00, "type": "deco"},
-    {"name": "Tx 50/15", "fO2": 0.50, "fHe": 0.15, "type": "deco"},
-    {"name": "Tx 35/35", "fO2": 0.35, "fHe": 0.35, "type": "deco"},
-    {"name": "Tx 24/35", "fO2": 0.24, "fHe": 0.35, "type": "deco"},
-    {"name": "Tx 17/70", "fO2": 0.17, "fHe": 0.70, "type": "deco"},
+    {"name": "Oxygen", "fO2": 1.00, "fHe": 0.00, "type": "deco", "switch_depth": 6},
+    {"name": "Tx 50/15", "fO2": 0.50, "fHe": 0.15, "type": "deco", "switch_depth": 21},
+    {"name": "Tx 35/35", "fO2": 0.35, "fHe": 0.35, "type": "deco", "switch_depth": 36},
+    {"name": "Tx 24/35", "fO2": 0.24, "fHe": 0.35, "type": "deco", "switch_depth": 57},
+    {"name": "Tx 17/70", "fO2": 0.17, "fHe": 0.70, "type": "deco", "switch_depth": 84},
     {"name": "Nx 32", "fO2": 0.32, "fHe": 0.00, "type": "bottom"},
     {"name": "Tx 21/35", "fO2": 0.21, "fHe": 0.35, "type": "bottom"},
     {"name": "Tx 18/45", "fO2": 0.18, "fHe": 0.45, "type": "bottom"},

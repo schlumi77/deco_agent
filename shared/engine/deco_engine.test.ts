@@ -140,6 +140,29 @@ describe('CCR loop mix (getCcrMix)', () => {
         expect(fhe).toBeCloseTo(0.429, 2);
     });
 
+    // Regression: shallower than about 3.5 m at setpoint 1.3 the setpoint
+    // exceeds the dry ambient pressure. The loop fO2 came out above 1.0 and
+    // the inert fractions negative (fO2 1.18, fHe -0.10 at 1.5 m).
+    it('makes the loop pure oxygen where the setpoint cannot be reached', () => {
+        const dil = { name: 'Tx 18/45', fO2: 0.18, fHe: 0.45, type: 'bottom' };
+        expect(getCcrMix(1.5, dil, 1.3)).toEqual([1.0, 0.0]);
+        expect(getCcrMix(0, dil, 1.3)).toEqual([1.0, 0.0]);
+    });
+
+    it('keeps loop fractions between 0 and 1 at every depth and setpoint', () => {
+        const dil = { name: 'Tx 18/45', fO2: 0.18, fHe: 0.45, type: 'bottom' };
+        for (let depth = 0; depth <= 100; depth += 0.5) {
+            for (const sp of [0.7, 1.0, 1.2, 1.3, 1.4, 1.6]) {
+                const [fo2, fhe] = getCcrMix(depth, dil, sp);
+                const fn2 = 1 - fo2 - fhe;
+                for (const f of [fo2, fhe, fn2]) {
+                    expect(f, `${depth} m, SP ${sp}`).toBeGreaterThanOrEqual(-1e-12);
+                    expect(f, `${depth} m, SP ${sp}`).toBeLessThanOrEqual(1 + 1e-12);
+                }
+            }
+        }
+    });
+
     it('never drops loop fO2 below the diluent fO2 (shallow / pure O2)', () => {
         const [fo2, fhe] = getCcrMix(6, { name: 'Oxygen', fO2: 1.0, fHe: 0.0, type: 'deco' }, 1.4);
         expect(fo2).toBe(1.0);

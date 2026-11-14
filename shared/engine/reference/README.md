@@ -38,7 +38,8 @@ green while the numbers are being collected.
 The external planner must plan the dive the way this one does. Where it can't
 match a setting, plan as close as it allows and say what differs in `notes`.
 The reference dives are set up for **GUE Deco Planner** via `gue()` in
-`dives.ts`; for another planner, adapt or replace that helper.
+`dives.ts`; **Baltic 1.0.2**, used for the CCR dive, shares those conventions.
+For another planner, adapt or replace that helper.
 
 | Setting | This planner |
 |---|---|
@@ -47,7 +48,7 @@ The reference dives are set up for **GUE Deco Planner** via `gue()` in
 | Descent | 20 m/min. This planner's bottom time starts on arrival at depth; the reference dives use `gue()` in `dives.ts`, which takes the reference planner's bottom time (descent included, as in GUE Deco Planner) and subtracts the descent. `npm run reference` prints both figures. |
 | Ascent | 10 m/min. Over the last 10 m this planner defaults to 1 m/min (`final_ascent_rate`); `gue()` sets it to the ascent rate, as GUE Deco Planner ascends at one rate to the surface. |
 | Stops | Every 3 m; last stop at 6 m unless the dive says 3 m; stop times in whole minutes |
-| Gas switches | On ascent, to the richest listed deco gas within pO2 1.6 that has more oxygen than the bottom gas. MODs use a 1 bar surface: oxygen at 6 m, Tx 50/15 at 22 m. On open circuit, a 1 min stop at each switch depth (21 m for Tx 50/15, 6 m for oxygen) even without a deco obligation there; GF Low stays anchored at the first stop the ceiling requires. No switch stop on the CCR loop, or at the bottom if the gas is usable there. |
+| Gas switches | On ascent, to the richest listed deco gas that has more oxygen than the bottom gas, at the gas's standard switch depth (`switch_depth` in `GASES`: the MOD for pO2 1.6 rounded to the nearest 3 m stop, e.g. oxygen 6 m, Tx 50/15 21 m, Tx 35/35 36 m). On open circuit, a 1 min stop at each switch depth even without a deco obligation there; GF Low stays anchored at the first stop the ceiling requires. No switch stop on the CCR loop, or at the bottom if the gas is usable there. |
 | Safety stop | None |
 | CCR | Constant setpoint; loop mix computed with water vapour 0.0627 bar |
 

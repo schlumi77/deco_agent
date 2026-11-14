@@ -72,9 +72,9 @@ program
   .description('Show standard diving gases and their limits')
   .action(() => {
     console.log(chalk.bold('\nStandard Diving Gases:'));
-    console.log(chalk.gray(''.padEnd(84, '-')));
-    console.log(`${chalk.bold('Gas'.padEnd(10))} | ${chalk.bold('Type'.padEnd(8))} | ${chalk.bold('fO2'.padStart(4))} | ${chalk.bold('fHe'.padStart(4))} | ${chalk.bold('Limit'.padStart(5))} | ${chalk.bold('MOD'.padStart(8))} | ${chalk.bold('MinOD'.padStart(8))} | ${chalk.bold('END@MOD'.padStart(8))}`);
-    console.log(chalk.gray(''.padEnd(84, '-')));
+    console.log(chalk.gray(''.padEnd(95, '-')));
+    console.log(`${chalk.bold('Gas'.padEnd(10))} | ${chalk.bold('Type'.padEnd(8))} | ${chalk.bold('fO2'.padStart(4))} | ${chalk.bold('fHe'.padStart(4))} | ${chalk.bold('Limit'.padStart(5))} | ${chalk.bold('MOD'.padStart(8))} | ${chalk.bold('Switch'.padStart(8))} | ${chalk.bold('MinOD'.padStart(8))} | ${chalk.bold('END@MOD'.padStart(8))}`);
+    console.log(chalk.gray(''.padEnd(95, '-')));
     
     GASES.forEach(gas => {
         const limitPo2 = gas.type === 'deco' ? 1.6 : 1.2;
@@ -82,7 +82,8 @@ program
         const minOd = calculateMinOd(gas.fO2);
         const end = calculateEnd(mod, gas.fHe);
         
-        console.log(`${gas.name.padEnd(10)} | ${gas.type.padEnd(8)} | ${gas.fO2.toFixed(2).padStart(4)} | ${gas.fHe.toFixed(2).padStart(4)} | ${limitPo2.toFixed(1).padStart(5)} | ${mod.toFixed(1).padStart(7)}m | ${minOd.toFixed(1).padStart(7)}m | ${end.toFixed(1).padStart(7)}m`);
+        const switchDepth = gas.switch_depth !== undefined ? `${gas.switch_depth.toFixed(0).padStart(7)}m` : '-'.padStart(8);
+        console.log(`${gas.name.padEnd(10)} | ${gas.type.padEnd(8)} | ${gas.fO2.toFixed(2).padStart(4)} | ${gas.fHe.toFixed(2).padStart(4)} | ${limitPo2.toFixed(1).padStart(5)} | ${mod.toFixed(1).padStart(7)}m | ${switchDepth} | ${minOd.toFixed(1).padStart(7)}m | ${end.toFixed(1).padStart(7)}m`);
     });
   });
 

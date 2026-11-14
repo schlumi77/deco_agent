@@ -10,6 +10,17 @@ export function gasLimitPo2(fo2: number, depth: number): number {
     return (GAS_LIMIT_SURFACE_PRESSURE + depth / 10) * fo2;
 }
 
+// Maximum pO2 for switching to a deco gas that has no listed switch depth.
+export const DECO_GAS_MAX_PO2 = 1.6;
+
+// Whether the ascent may switch to a deco gas at a depth: down to its listed
+// switch depth, or down to its MOD for DECO_GAS_MAX_PO2 if it has none.
+export function canSwitchTo(gas: Gas, depth: number): boolean {
+    return gas.switch_depth !== undefined
+        ? depth <= gas.switch_depth
+        : gasLimitPo2(gas.fO2, depth) <= DECO_GAS_MAX_PO2;
+}
+
 export function calculateMod(fo2: number, maxPo2: number, surfacePressure = GAS_LIMIT_SURFACE_PRESSURE): number {
     if (fo2 <= 0) return Infinity;
     return (maxPo2 / fo2 - surfacePressure) * 10;
@@ -26,10 +37,14 @@ export function calculateEnd(depth: number, fhe: number, surfacePressure = SURFA
     return (p_amb * (1 - fhe) - surfacePressure) * 10;
 }
 
+// Loop oxygen and helium fractions on a CCR holding setpoint `sp` at a depth.
+// Where the setpoint exceeds the dry ambient pressure (shallower than about
+// 3.5 m at setpoint 1.3) it cannot be reached: the loop is pure oxygen and the
+// actual pO2 is the dry ambient pressure.
 export function getCcrMix(depth: number, dil: Gas, sp: number, surfacePressure = SURFACE_PRESSURE): [number, number] {
     const p_amb = surfacePressure + depth / 10.0;
     const p_dry_total = p_amb - WATER_VAPOR_PRESSURE;
-    const fo2_loop = Math.max(dil.fO2, sp / p_dry_total);
+    const fo2_loop = Math.min(1.0, Math.max(dil.fO2, sp / p_dry_total));
     const f_inert_total = 1.0 - fo2_loop;
     const f_inert_dil = 1.0 - dil.fO2;
     const fhe_loop = f_inert_dil > 0 ? f_inert_total * (dil.fHe / f_inert_dil) : 0.0;
@@ -264,7 +279,7 @@ class DivePlanner {
 
     private getBestGas(d: number): { gas: Gas; setpoint: number | null } {
         for (const g of this.decoCandidates) {
-            if (gasLimitPo2(g.fO2, d) <= 1.6) {
+            if (canSwitchTo(g, d)) {
                 return { 
                     gas: g, 
                     setpoint: this.isCcr ? this.effectiveDecoGasSetpoint : null 
