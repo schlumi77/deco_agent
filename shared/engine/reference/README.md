@@ -51,7 +51,7 @@ For another planner, add a helper with its conventions.
 | Stops | Every 3 m; last stop at 6 m unless the dive says 3 m; stop times in whole minutes |
 | Gas switches | On ascent, to the richest listed deco gas that has more oxygen than the bottom gas, at the gas's standard switch depth (`switch_depth` in `GASES`: the MOD for pO2 1.6 rounded to the nearest 3 m stop, e.g. oxygen 6 m, Tx 50/15 21 m, Tx 35/35 36 m). On open circuit, a 1 min stop at each switch depth even without a deco obligation there; GF Low stays anchored at the first stop the ceiling requires. No switch stop on the CCR loop, or at the bottom if the gas is usable there. |
 | Safety stop | None |
-| CCR | Constant setpoint; loop mix computed with water vapour 0.0627 bar |
+| CCR | Constant setpoint. Tissues load inert gas at ambient pressure minus the setpoint, without a water vapour deduction; CNS/OTU use the physical loop mix (water vapour 0.0627 bar). |
 
 ## Tolerance
 

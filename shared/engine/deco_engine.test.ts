@@ -191,3 +191,17 @@ describe('Surfacing gradient factor (getSurfaceGf)', () => {
         expect(gf).toBeLessThan(mValueShare);
     });
 });
+
+describe('Toxicity fraction override', () => {
+    it('computes CNS/OTU from toxicity_fo2 when given, not from the loading fraction', () => {
+        const withOverride = new DecoEngine(SURFACE_PRESSURE, 'C');
+        withOverride.updateTissues(6, 6, 1, 0.5, 0.0, 1.0);
+        const realPo2 = SURFACE_PRESSURE + 0.6;
+        expect(withOverride.toxicity_tracker.otus).toBeCloseTo(Math.pow((realPo2 - 0.5) / 0.5, 0.833), 9);
+
+        // Inert loading still follows the fractions passed in.
+        const plain = new DecoEngine(SURFACE_PRESSURE, 'C');
+        plain.updateTissues(6, 6, 1, 0.5, 0.0);
+        expect(withOverride.p_n2).toEqual(plain.p_n2);
+    });
+});

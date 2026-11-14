@@ -12,8 +12,10 @@ import {
     calculateMod,
     gasLimitPo2,
     canSwitchTo,
+    getCcrMix,
+    getCcrLoadingMix,
 } from './planner.js';
-import { SURFACE_PRESSURE, DecoEngine } from './deco_engine.js';
+import { SURFACE_PRESSURE, DecoEngine, WATER_VAPOR_PRESSURE } from './deco_engine.js';
 import type { DivePlanResponse } from '../types.js';
 
 const DECO_GASES = ['Oxygen', 'Tx 50/15'];
@@ -683,5 +685,74 @@ describe('Gas switch depths', () => {
         const res = planDive({ depth: 90, bottom_time: 25.5, bottom_gas: 'Tx 12/65', deco_gases: ['Tx 35/35', 'Tx 50/15', 'Oxygen'], gf_low: 40, gf_high: 70 });
         expect(res.schedule.find(s => s.depth === 36)?.gas).toBe('Tx 35/35');
         expect(res.schedule.find(s => s.depth === 39)?.gas).toBe('Tx 12/65');
+    });
+});
+
+describe('CCR loop inert gas convention', () => {
+    // On the loop the tissues load inert gas at ambient pressure minus the
+    // setpoint, with no deduction for water vapour. That is more conservative
+    // than the physical loop mix, mostly at shallow stops, and matches Baltic
+    // 1.0.2: with the physical mix the 60 m reference dive ran 83 min against
+    // Baltic's 87, with a 6 m stop of 28 min against 33.
+
+    const dil = GASES.find(g => g.name === 'Tx 18/45')!;
+    const alveolarInert = (depth: number, [fo2]: [number, number]) =>
+        (SURFACE_PRESSURE + depth / 10 - WATER_VAPOR_PRESSURE) * (1 - fo2);
+
+    it('loads inert gas at ambient pressure minus the setpoint', () => {
+        for (const depth of [6, 21, 40]) {
+            expect(alveolarInert(depth, getCcrLoadingMix(depth, dil, 1.3)), `${depth} m`)
+                .toBeCloseTo(SURFACE_PRESSURE + depth / 10 - 1.3, 9);
+        }
+    });
+
+    it('caps the inert gas at the diluent where the setpoint is close to the diluent pO2', () => {
+        // At 60 m ambient minus 1.3 would exceed the inert gas the diluent
+        // carries (pO2 1.25 dry), and the loop cannot be leaner than its diluent.
+        const [fo2, fhe] = getCcrLoadingMix(60, dil, 1.3);
+        expect(fo2).toBeCloseTo(dil.fO2, 9);
+        expect(fhe).toBeCloseTo(dil.fHe, 9);
+        expect(alveolarInert(60, [fo2, fhe])).toBeLessThan(SURFACE_PRESSURE + 6 - 1.3);
+    });
+
+    it('is more conservative than the physical loop mix, most of all shallow', () => {
+        const extra = (depth: number) =>
+            alveolarInert(depth, getCcrLoadingMix(depth, dil, 1.3)) / alveolarInert(depth, getCcrMix(depth, dil, 1.3)) - 1;
+        expect(extra(60)).toBeGreaterThan(0);
+        expect(extra(60)).toBeLessThan(0.02);
+        expect(extra(6)).toBeGreaterThan(0.2);
+    });
+
+    it("keeps the diluent's helium to nitrogen ratio", () => {
+        const [fo2, fhe] = getCcrLoadingMix(30, dil, 1.3);
+        expect(fhe / (1 - fo2 - fhe)).toBeCloseTo(dil.fHe / (1 - dil.fO2 - dil.fHe), 9);
+    });
+
+    it('carries no inert gas where the setpoint reaches ambient pressure', () => {
+        expect(getCcrLoadingMix(2, dil, 1.3)).toEqual([1.0, 0.0]);
+    });
+
+    it('never carries more inert gas than the diluent', () => {
+        const [fo2, fhe] = getCcrLoadingMix(60, dil, 0.2);
+        expect(fo2).toBeCloseTo(dil.fO2, 9);
+        expect(fhe).toBeCloseTo(dil.fHe, 9);
+    });
+
+    it('still shows and doses oxygen with the physical loop mix', () => {
+        const res = planDive({ depth: 50, bottom_time: 20, bottom_gas: 'Tx 18/45', is_ccr: true, setpoint: 1.3, deco_gases: [] });
+        expect(res.schedule[0].gas).toBe('CCR SP 1.3 [22/43]');
+        // Bottom phase CNS from the physical pO2, not the leaner loading mix.
+        const [physicalFo2] = getCcrMix(50, dil, 1.3);
+        const engine = new DecoEngine(SURFACE_PRESSURE, 'C');
+        const before = engine.toxicity_tracker.cns_percent;
+        engine.updateTissues(50, 50, 20, ...getCcrLoadingMix(50, dil, 1.3), physicalFo2);
+        const physicalPo2 = (SURFACE_PRESSURE + 5) * physicalFo2;
+        expect(engine.toxicity_tracker.cns_percent - before).toBeCloseTo(engine.toxicity_tracker.calculateCnsContribution(physicalPo2, 20), 9);
+    });
+
+    it('plans the 60 m Baltic reference dive (golden)', () => {
+        const res = planDive({ depth: 60, bottom_time: 25, bottom_gas: 'Tx 18/45', deco_gases: [], is_ccr: true, setpoint: 1.3, deco_setpoint: 1.3, final_ascent_rate: 10 });
+        expect(res.schedule.slice(1).map(s => [s.depth, s.time])).toEqual([[27, 1], [24, 2], [21, 2], [18, 2], [15, 4], [12, 5], [9, 7], [6, 30]]);
+        expect(res.profile[res.profile.length - 1].time).toBeCloseTo(87, 9);
     });
 });
